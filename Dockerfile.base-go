@@ -1,0 +1,20 @@
+# syntax=docker/dockerfile:1
+# ─────────────────────────────────────────────────────────────────────────────
+# Dockerfile.base-go
+# Shared Go builder base.  Service Dockerfiles do:
+#   FROM fl-base-go:latest AS builder
+#   ... copy source, go build ...
+#   FROM gcr.io/distroless/static AS final
+#   COPY --from=builder /app/bin/<svc> /svc
+#   ENTRYPOINT ["/svc"]
+# ─────────────────────────────────────────────────────────────────────────────
+FROM golang:1.23-alpine AS base
+
+RUN apk add --no-cache git ca-certificates tzdata
+
+WORKDIR /app
+
+# Pre-warm module cache with grpc + protobuf so service builds are faster.
+# We copy only go.mod/go.sum from the proto module (no source needed here).
+COPY proto/aggregationv1/go.mod proto/aggregationv1/go.sum* ./proto/aggregationv1/
+RUN cd proto/aggregationv1 && go mod download
