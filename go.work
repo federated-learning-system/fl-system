@@ -1,0 +1,10 @@
+go 1.23
+
+use (
+	./proto/aggregationv1
+	./services/aggregation-server
+	./services/client-registry
+	./services/orchestration
+	./services/straggler-watch
+	./services/websocket-push
+)
