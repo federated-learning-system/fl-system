@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1
+# ─────────────────────────────────────────────────────────────────────────────
+# Dockerfile.base-python
+# Shared Python 3.11 base for ML services (fedavg-engine, offload-worker,
+# inference-server, fl-client).  Uses uv for fast, reproducible installs.
+#
+# Service Dockerfiles do:
+#   FROM fl-base-python:latest
+#   COPY . /app
+#   CMD ["python", "-m", "my_service"]
+# ─────────────────────────────────────────────────────────────────────────────
+FROM python:3.11-slim AS base
+
+# Install uv (fast pip replacement) + system libs needed by torch/grpcio
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        libssl-dev \
+        curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -Ls https://astral.sh/uv/install.sh | sh
+
+ENV PATH="/root/.local/bin:$PATH"
+
+WORKDIR /app
+
+# Install ML + service dependencies via uv into the system site-packages
+# (no venv needed inside Docker — the container IS the isolation boundary).
+# torch CPU-only (~200 MB) — GPU training runs on the host, not in the container
+RUN uv pip install --system \
+        --extra-index-url https://download.pytorch.org/whl/cpu \
+        "numpy<2" \
+        torch==2.3.1+cpu \
+        onnxruntime==1.18.0 \
+        sentencepiece==0.2.0 \
+        grpcio==1.64.0 \
+        grpcio-tools==1.64.0 \
+        "protobuf>=5.26.1,<6.0" \
+        fastapi==0.111.0 \
+        "uvicorn[standard]==0.30.1" \
+        redis==5.0.4 \
+        boto3==1.34.131 \
+        opacus==1.4.1 \
+        prometheus-client==0.20.0

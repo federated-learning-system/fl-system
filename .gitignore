@@ -1,0 +1,29 @@
+temp/
+
+# Python virtual environment
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Certs (generated, never commit private keys or the K8s secret manifest)
+infra/certs/*.crt
+infra/certs/*.key
+infra/certs/*.pem
+infra/certs/*.csr
+infra/certs/*.srl
+infra/k8s/secrets/tls-secrets.yaml
+
+# Env
+.env
+.env.*
+
+# Go test artifacts
+*.test
+*.out
+
+# Editor
+.idea/
+.vscode/
+*.swp
+CLAUDE.md
