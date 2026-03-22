@@ -1,0 +1,115 @@
+# infra/k8s/minio-init-job.yaml
+#
+# One-shot Kubernetes Job that creates the required MinIO buckets and sets
+# lifecycle expiry rules after the MinIO Helm release is ready.
+#
+# Run automatically by storage-setup.sh after `helm install minio`.
+# Re-running is safe — mc commands are idempotent.
+#
+# Bucket layout:
+#   fl-models/
+#     models/         - PyTorch checkpoints + ONNX exports
+#     updates/        - Per-round client delta files  (lifecycle: 2-day expiry)
+#     offload-jobs/   - ESP32 token blobs (read once by offload-worker)
+#     vocab/          - BPE vocabulary shared across all clients
+#   fl-offload/
+#     jobs/           - Offload job manifests        (lifecycle: 1-day expiry)
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-bucket-init
+  namespace: fl-system
+  labels:
+    app.kubernetes.io/component: minio-init
+spec:
+  ttlSecondsAfterFinished: 300   # clean up pod 5 min after completion
+  backoffLimit: 4
+  template:
+    metadata:
+      labels:
+        job-name: minio-bucket-init
+    spec:
+      restartPolicy: OnFailure
+      # ── Wait for MinIO API to be ready before running mc ──────────────────
+      initContainers:
+        - name: wait-for-minio
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for MinIO at minio:9000 ..."
+              until wget -qO- http://minio:9000/minio/health/live 2>/dev/null; do
+                echo "  MinIO not ready — retrying in 3s"
+                sleep 3
+              done
+              echo "MinIO is up."
+      # ── Main container: run mc to create buckets + lifecycle rules ─────────
+      containers:
+        - name: mc-init
+          image: minio/mc:latest
+          env:
+            # Credentials match storage-setup.sh helm values.
+            # The official MinIO chart (charts.min.io) stores these in a Secret
+            # named after the release with keys rootUser/rootPassword, but key
+            # names differ across chart versions so we inline them here for
+            # reliability in this dev cluster.
+            - name: MINIO_ROOT_USER
+              value: "flminio"
+            - name: MINIO_ROOT_PASSWORD
+              value: "flminio123"
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+
+              echo "==> Configuring mc alias..."
+              mc alias set local http://minio:9000 "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}"
+
+              echo "==> Creating buckets (idempotent)..."
+              mc mb --ignore-existing local/fl-models
+              mc mb --ignore-existing local/fl-offload
+
+              echo "==> Setting lifecycle rules..."
+
+              # updates/ prefix in fl-models: auto-delete after 48 h (2 days)
+              mc ilm rule add \
+                --expire-days 2 \
+                --prefix "updates/" \
+                local/fl-models \
+                && echo "    fl-models/updates/ → 2-day expiry OK" \
+                || echo "    WARNING: could not set fl-models/updates/ ILM (may already exist)"
+
+              # offload-jobs/ prefix in fl-models: auto-delete after 1 day (minimum resolution)
+              mc ilm rule add \
+                --expire-days 1 \
+                --prefix "offload-jobs/" \
+                local/fl-models \
+                && echo "    fl-models/offload-jobs/ → 1-day expiry OK" \
+                || echo "    WARNING: could not set fl-models/offload-jobs/ ILM (may already exist)"
+
+              # fl-offload bucket: whole-bucket 1-day expiry
+              mc ilm rule add \
+                --expire-days 1 \
+                local/fl-offload \
+                && echo "    fl-offload/ → 1-day expiry OK" \
+                || echo "    WARNING: could not set fl-offload ILM (may already exist)"
+
+              echo ""
+              echo "==> Bucket state:"
+              mc ls local/
+              echo ""
+              echo "==> Lifecycle rules:"
+              mc ilm rule ls local/fl-models  || true
+              mc ilm rule ls local/fl-offload || true
+
+              echo "==> MinIO initialisation complete."
+          resources:
+            limits:
+              memory: 64Mi
+              cpu: 100m
+            requests:
+              memory: 32Mi
+              cpu: 50m
