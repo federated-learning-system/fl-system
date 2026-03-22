@@ -1,0 +1,164 @@
+syntax = "proto3";
+
+package fl.aggregation.v1;
+
+option go_package = "github.com/x9z0/fls/proto/aggregationv1";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Service
+// ─────────────────────────────────────────────────────────────────────────────
+
+service AggregationService {
+  // Server-side: start a new FL round and return the model URL to clients.
+  rpc StartRound(StartRoundReq) returns (StartRoundResp);
+
+  // Fetch the current (or a specific) global model metadata + presigned URL.
+  rpc GetGlobalModel(GetModelReq) returns (GetModelResp);
+
+  // Client submits its DP-protected model delta after local training.
+  rpc SubmitUpdate(SubmitUpdateReq) returns (SubmitUpdateResp);
+
+  // Client pushes per-round telemetry to the server-side Prometheus gateway.
+  rpc EmitMetrics(MetricsReq) returns (MetricsResp);
+
+  // Client or offload worker registers with the system on first contact.
+  rpc RegisterClient(RegisterReq) returns (RegisterResp);
+
+  // Inference proxy: web keyboard calls this when local ONNX model is absent.
+  rpc Infer(InferReq) returns (InferResp);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// StartRound
+// ─────────────────────────────────────────────────────────────────────────────
+
+message StartRoundReq {
+  string      round_id      = 1; // e.g. "round-2026-03-15-0001"
+  string      model_version = 2; // e.g. "v1.4.1"
+  RoundConfig config        = 3;
+}
+
+message RoundConfig {
+  int32    local_epochs   = 1; // local training epochs per client (default: 1)
+  int32    min_clients    = 2; // minimum updates before aggregation proceeds
+  int64    deadline_unix  = 3; // Unix timestamp — round closes at this time
+  DPConfig dp             = 4; // differential privacy parameters
+  string   compression    = 5; // "gzip" | "none" | "quantized_8bit"
+  bool     async_allowed  = 6; // if true, accept updates after deadline with penalty
+  int32    mini_batch_size = 7; // mini-batch size for local training (default: 32)
+  double   fedprox_mu     = 8; // FedProx regularisation strength (default: 0.01)
+}
+
+message DPConfig {
+  double epsilon    = 1; // per-round DP epsilon target (default: 1.0)
+  double delta      = 2; // DP delta (default: 1e-5)
+  double clip_norm  = 3; // L2 gradient clip bound (default: 1.0)
+  double noise_mult = 4; // Gaussian noise multiplier sigma (default: 1.1)
+}
+
+message StartRoundResp {
+  bool   ok        = 1;
+  string model_url = 2; // presigned MinIO GET URL for model_quant.onnx
+  int64  deadline  = 3; // mirrors RoundConfig.deadline_unix for convenience
+  string round_id  = 4; // echo back so client can correlate async responses
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GetGlobalModel
+// ─────────────────────────────────────────────────────────────────────────────
+
+message GetModelReq {
+  // Empty string = "give me the current model".
+  string model_version = 1;
+}
+
+message GetModelResp {
+  string model_url    = 1; // presigned MinIO GET URL
+  bytes  model_meta   = 2; // JSON-encoded model metadata blob (version, checksum, …)
+  string vocab_url    = 3; // presigned URL for vocab_8192.model
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SubmitUpdate
+// ─────────────────────────────────────────────────────────────────────────────
+
+message SubmitUpdateReq {
+  string         round_id    = 1;
+  string         client_id   = 2;
+  bytes          update_blob = 3; // gzip( DP-applied float32 model delta )
+  UpdateMetadata meta        = 4;
+}
+
+message UpdateMetadata {
+  int32  num_samples    = 1; // local training sample count — used for FedAvg weight
+  int32  local_epochs   = 2;
+  double dp_epsilon     = 3; // actual epsilon spent this round (from RDP accountant)
+  double dp_delta       = 4;
+  double clip_norm      = 5;
+  string model_version  = 6; // base model version this delta was computed from
+  string checksum       = 7; // "sha256:<hex>" of update_blob
+  string device_class   = 8; // LAPTOP_SIM | ANDROID | ESP32 | OFFLOAD_WORKER
+  bool   is_straggler   = 9; // set server-side by Straggler Watch before aggregation
+}
+
+message SubmitUpdateResp {
+  bool   accepted = 1;
+  string reason   = 2; // e.g. "duplicate", "round_closed", "checksum_mismatch"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EmitMetrics
+// ─────────────────────────────────────────────────────────────────────────────
+
+message MetricsReq {
+  string client_id              = 1;
+  string round_id               = 2;
+  double local_train_duration_s = 3;
+  int32  samples_trained        = 4;
+  double dp_epsilon_spent       = 5; // epsilon consumed in this round
+  double dp_epsilon_cumulative  = 6; // total epsilon consumed by this client
+  double battery_percent        = 7;
+  bool   offloaded              = 8; // true if this client used the offload path
+}
+
+message MetricsResp {
+  bool ok = 1;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RegisterClient
+// ─────────────────────────────────────────────────────────────────────────────
+
+message RegisterReq {
+  string             client_id    = 1; // client-provided hint; server may reassign
+  string             device_class = 2; // LAPTOP_SIM | ANDROID | ESP32
+  DeviceCapabilities caps         = 3;
+}
+
+message DeviceCapabilities {
+  int32  ram_mb         = 1;
+  bool   has_gpu        = 2;
+  int32  cpu_cores      = 3;
+  string os             = 4; // "linux" | "android" | "freertos"
+  bool   can_train      = 5; // false for ESP32 — will always use offload path
+  int32  vocab_size_cap = 6; // max vocabulary size the device can load in memory
+}
+
+message RegisterResp {
+  bool   ok                 = 1;
+  string assigned_client_id = 2; // canonical client_id to use in all subsequent calls
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Infer  (server-side fallback for web keyboard cold-start)
+// ─────────────────────────────────────────────────────────────────────────────
+
+message InferReq {
+  repeated int32 token_ids = 1; // context window (up to 10 tokens)
+  int32          top_k     = 2; // number of suggestions to return (default: 3)
+}
+
+message InferResp {
+  repeated string suggestions = 1; // decoded subword strings
+  repeated float  scores      = 2; // raw logit values (not softmax)
+}
