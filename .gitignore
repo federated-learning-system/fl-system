@@ -22,6 +22,10 @@ infra/k8s/secrets/tls-secrets.yaml
 *.test
 *.out
 
+# Trained tokenizer models (regenerate with: .venv/bin/python ml/tokenizer/train_tokenizer.py)
+ml/tokenizer/*.model
+ml/tokenizer/*.vocab
+
 # Editor
 .idea/
 .vscode/
