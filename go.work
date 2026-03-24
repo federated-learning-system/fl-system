@@ -7,4 +7,5 @@ use (
 	./services/orchestration
 	./services/straggler-watch
 	./services/websocket-push
+	./services/offload-worker/api
 )

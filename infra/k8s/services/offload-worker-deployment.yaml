@@ -1,0 +1,85 @@
+---
+# infra/k8s/services/offload-worker-deployment.yaml
+#
+# Deployment for the Offload Worker (Go API + Python Trainer).
+#
+# Prerequisites:
+#   - Redis and MinIO running in fl-system namespace
+#   - Model seeded in MinIO
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: offload-worker
+  namespace: fl-system
+  labels:
+    app: offload-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: offload-worker
+  template:
+    metadata:
+      labels:
+        app: offload-worker
+    spec:
+      containers:
+        - name: offload-worker
+          image: offload-worker:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8085
+              name: http
+          env:
+            - name: PORT
+              value: "8085"
+            - name: REDIS_HOST
+              value: "redis-master"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_ADDR
+              value: "redis-master:6379"
+            - name: MINIO_ENDPOINT
+              value: "http://minio:9000"
+            - name: MINIO_ENDPOINT_RAW
+              value: "minio:9000"
+            - name: MINIO_ACCESS_KEY
+              value: "flminio"
+            - name: MINIO_SECRET_KEY
+              value: "flminio123"
+            - name: AGG_GRPC_ADDR
+              value: "aggregation-server:50051"
+            - name: TLS_ENABLED
+              value: "false"
+            - name: CONSUMER_NAME
+              value: "trainer-0"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: offload-worker
+  namespace: fl-system
+spec:
+  selector:
+    app: offload-worker
+  ports:
+    - port: 8085
+      targetPort: http
+      protocol: TCP
+      name: http
+  type: ClusterIP
