@@ -1,0 +1,88 @@
+---
+# infra/k8s/services/client-registry-deployment.yaml
+#
+# Deployment + Service for the FL Client Registry.
+#
+# Prerequisites:
+#   - PostgreSQL running in fl-system namespace
+#   - fl-base-go image built (make build-go-base)
+#   - client-registry image built
+#
+# Usage:
+#   kubectl apply -f infra/k8s/services/client-registry-deployment.yaml
+#   kubectl logs -n fl-system -l app=client-registry -f
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: client-registry
+  namespace: fl-system
+  labels:
+    app: client-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: client-registry
+  template:
+    metadata:
+      labels:
+        app: client-registry
+    spec:
+      containers:
+        - name: client-registry
+          image: client-registry:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+              name: http
+          env:
+            - name: PORT
+              value: "8081"
+            - name: DB_HOST
+              value: "postgresql"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: "postgres"
+            - name: DB_PASSWORD
+              value: "flpg123"
+            - name: DB_NAME
+              value: "fl_registry"
+            - name: JWT_SECRET
+              value: "fl-dev-secret-change-in-prod"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: client-registry
+  namespace: fl-system
+spec:
+  selector:
+    app: client-registry
+  ports:
+    - port: 8081
+      targetPort: http
+      protocol: TCP
+      name: http
+  type: ClusterIP

@@ -22,6 +22,20 @@ infra/k8s/secrets/tls-secrets.yaml
 *.test
 *.out
 
+# Trained tokenizer models (regenerate with: .venv/bin/python ml/tokenizer/train_tokenizer.py)
+ml/tokenizer/*.model
+ml/tokenizer/*.vocab
+
+# Model checkpoints (regenerate with: .venv/bin/python ml/training/warmstart_train.py)
+ml/training/checkpoints/
+ml/training/warmstart_final.pt
+
+# ONNX exports (regenerate with: .venv/bin/python ml/model/export_onnx.py)
+ml/model/*.onnx
+
+# Synthetic client datasets (regenerate with: .venv/bin/python ml/synthetic_data/export_datasets.py)
+data/
+
 # Editor
 .idea/
 .vscode/

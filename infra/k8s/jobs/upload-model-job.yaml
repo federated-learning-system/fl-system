@@ -1,0 +1,108 @@
+---
+# infra/k8s/jobs/upload-model-job.yaml
+#
+# Uploads ONNX model files to MinIO (fl-models/models/v0/) and seeds Redis
+# with the model:current pointer.
+#
+# Prerequisites:
+#   - MinIO running in fl-system namespace
+#   - Redis running in fl-system namespace
+#   - ONNX files built via: .venv/bin/python ml/model/export_onnx.py
+#
+# Usage:
+#   kubectl delete job upload-model --namespace fl-system --ignore-not-found
+#   kubectl apply -f infra/k8s/jobs/upload-model-job.yaml
+#   kubectl logs -n fl-system -l job-name=upload-model -f
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: upload-model
+  namespace: fl-system
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+
+      initContainers:
+        # Wait for MinIO to be healthy
+        - name: wait-for-minio
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for MinIO..."
+              until wget -qO- http://minio:9000/minio/health/live 2>/dev/null; do
+                sleep 3
+              done
+              echo "MinIO is ready."
+
+      containers:
+        - name: upload
+          image: minio/mc:latest
+          env:
+            - name: MINIO_ROOT_USER
+              value: "flminio"
+            - name: MINIO_ROOT_PASSWORD
+              value: "flminio123"
+            - name: MODEL_VERSION
+              value: "v0"
+            - name: REDIS_HOST
+              value: "redis-master"
+            - name: REDIS_PORT
+              value: "6379"
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+
+              echo "==> Configuring mc alias..."
+              mc alias set myminio http://minio:9000 "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}"
+
+              echo "==> Uploading ONNX models to fl-models/models/${MODEL_VERSION}/..."
+
+              # Upload float32 model
+              mc cp /models/model.onnx "myminio/fl-models/models/${MODEL_VERSION}/model.onnx"
+              echo "    Uploaded model.onnx"
+
+              # Upload INT8 quantized model
+              mc cp /models/model_quant.onnx "myminio/fl-models/models/${MODEL_VERSION}/model_quant.onnx"
+              echo "    Uploaded model_quant.onnx"
+
+              # Upload model config
+              mc cp /models/model_config.json "myminio/fl-models/models/${MODEL_VERSION}/model_config.json"
+              echo "    Uploaded model_config.json"
+
+              # Upload vocab file if present
+              if [ -f /models/vocab_8192.model ]; then
+                mc cp /models/vocab_8192.model "myminio/fl-models/vocab/vocab_8192.model"
+                echo "    Uploaded vocab_8192.model"
+              fi
+
+              # Verify uploads
+              echo "==> Verifying uploads..."
+              mc ls "myminio/fl-models/models/${MODEL_VERSION}/"
+
+              echo "==> Model upload complete."
+
+          volumeMounts:
+            - name: model-files
+              mountPath: /models
+              readOnly: true
+
+      volumes:
+        # Mount model files from host. Adjust hostPath for your environment.
+        # For k3d, use: kubectl cp to copy files into a PVC or ConfigMap instead.
+        # Alternatively, build a custom image with the model files baked in.
+        #
+        # Quick approach for local dev:
+        #   1. kubectl port-forward -n fl-system svc/minio 19000:9000
+        #   2. mc alias set local http://localhost:19000 flminio flminio123
+        #   3. mc cp ml/model/model.onnx local/fl-models/models/v0/
+        #   4. mc cp ml/model/model_quant.onnx local/fl-models/models/v0/
+        - name: model-files
+          emptyDir: {}
