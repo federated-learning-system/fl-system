@@ -1,0 +1,107 @@
+---
+# infra/k8s/services/orchestration-deployment.yaml
+#
+# Deployment + Service for the FL Orchestration Controller.
+#
+# Prerequisites:
+#   - PostgreSQL running in fl-system namespace
+#   - aggregation-server running and reachable
+#   - TLS secrets created (infra/k8s/secrets/tls-secrets.yaml)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestration
+  namespace: fl-system
+  labels:
+    app: orchestration
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orchestration
+  template:
+    metadata:
+      labels:
+        app: orchestration
+    spec:
+      containers:
+        - name: orchestration
+          image: orchestration:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8082
+              name: http
+          env:
+            - name: PORT
+              value: "8082"
+            - name: DB_HOST
+              value: "postgresql"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: "postgres"
+            - name: DB_PASSWORD
+              value: "flpg123"
+            - name: DB_NAME
+              value: "fl_registry"
+            - name: AGG_GRPC_ADDR
+              value: "aggregation-server:50051"
+            - name: TLS_ENABLED
+              value: "true"
+            - name: TLS_CERT
+              value: "/certs/client-tech.crt"
+            - name: TLS_KEY
+              value: "/certs/client-tech.key"
+            - name: TLS_CA
+              value: "/certs/ca.crt"
+            - name: REGISTRY_URL
+              value: "http://client-registry:8081"
+            - name: MIN_CLIENTS_PER_ROUND
+              value: "2"
+            - name: ROUND_INTERVAL_MINUTES
+              value: "60"
+          volumeMounts:
+            - name: tls-certs
+              mountPath: /certs
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+      volumes:
+        - name: tls-certs
+          secret:
+            secretName: fl-tls-certs
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestration
+  namespace: fl-system
+spec:
+  selector:
+    app: orchestration
+  ports:
+    - port: 8082
+      targetPort: http
+      protocol: TCP
+      name: http
+  type: ClusterIP
