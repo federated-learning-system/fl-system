@@ -1,0 +1,107 @@
+---
+# infra/k8s/services/aggregation-server-deployment.yaml
+#
+# Deployment + Service for the FL Aggregation Server (gRPC + mTLS).
+#
+# Prerequisites:
+#   - Redis and MinIO running in fl-system namespace
+#   - TLS secrets created (infra/k8s/secrets/tls-secrets.yaml)
+#   - aggregation-server image built
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aggregation-server
+  namespace: fl-system
+  labels:
+    app: aggregation-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aggregation-server
+  template:
+    metadata:
+      labels:
+        app: aggregation-server
+    spec:
+      containers:
+        - name: aggregation-server
+          image: aggregation-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 50051
+              name: grpc
+            - containerPort: 9090
+              name: metrics
+          env:
+            - name: GRPC_PORT
+              value: "50051"
+            - name: METRICS_PORT
+              value: "9090"
+            - name: REDIS_ADDR
+              value: "redis-master:6379"
+            - name: MINIO_ENDPOINT
+              value: "minio:9000"
+            - name: MINIO_ACCESS_KEY
+              value: "flminio"
+            - name: MINIO_SECRET_KEY
+              value: "flminio123"
+            - name: TLS_CERT
+              value: "/certs/server.crt"
+            - name: TLS_KEY
+              value: "/certs/server.key"
+            - name: TLS_CA
+              value: "/certs/ca.crt"
+            - name: REGISTRY_URL
+              value: "http://client-registry:8081"
+            - name: INFERENCE_URL
+              value: "http://inference-server:8000"
+          volumeMounts:
+            - name: tls-certs
+              mountPath: /certs
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+
+      volumes:
+        - name: tls-certs
+          secret:
+            secretName: fl-tls-certs
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aggregation-server
+  namespace: fl-system
+spec:
+  selector:
+    app: aggregation-server
+  ports:
+    - port: 50051
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+    - port: 9090
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  type: ClusterIP
