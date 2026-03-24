@@ -1,0 +1,79 @@
+---
+# infra/k8s/services/fedavg-engine-deployment.yaml
+#
+# Deployment for the FedAvg-R Aggregation Engine.
+#
+# Prerequisites:
+#   - Redis and MinIO running in fl-system namespace
+#   - Model seeded in MinIO + Redis
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fedavg-engine
+  namespace: fl-system
+  labels:
+    app: fedavg-engine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fedavg-engine
+  template:
+    metadata:
+      labels:
+        app: fedavg-engine
+    spec:
+      containers:
+        - name: fedavg-engine
+          image: fedavg-engine:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9093
+              name: metrics
+          env:
+            - name: REDIS_HOST
+              value: "redis-master"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: MINIO_ENDPOINT
+              value: "http://minio:9000"
+            - name: MINIO_ACCESS_KEY
+              value: "flminio"
+            - name: MINIO_SECRET_KEY
+              value: "flminio123"
+            - name: METRICS_PORT
+              value: "9093"
+            - name: PENALTY_FACTOR
+              value: "0.5"
+            - name: MIN_CLIENTS
+              value: "2"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fedavg-engine
+  namespace: fl-system
+spec:
+  selector:
+    app: fedavg-engine
+  ports:
+    - port: 9093
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  type: ClusterIP
