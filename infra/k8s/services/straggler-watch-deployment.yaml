@@ -1,0 +1,72 @@
+---
+# infra/k8s/services/straggler-watch-deployment.yaml
+#
+# Deployment for the FL Straggler Watch service.
+#
+# Prerequisites:
+#   - Redis running in fl-system namespace
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: straggler-watch
+  namespace: fl-system
+  labels:
+    app: straggler-watch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: straggler-watch
+  template:
+    metadata:
+      labels:
+        app: straggler-watch
+    spec:
+      containers:
+        - name: straggler-watch
+          image: straggler-watch:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9092
+              name: metrics
+          env:
+            - name: REDIS_ADDR
+              value: "redis-master:6379"
+            - name: METRICS_PORT
+              value: "9092"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 25m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: straggler-watch
+  namespace: fl-system
+spec:
+  selector:
+    app: straggler-watch
+  ports:
+    - port: 9092
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  type: ClusterIP
