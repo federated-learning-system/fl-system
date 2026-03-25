@@ -1,0 +1,81 @@
+---
+# infra/k8s/services/inference-server-deployment.yaml
+#
+# Deployment for the ONNX Inference Server.
+#
+# Prerequisites:
+#   - Redis and MinIO running in fl-system namespace
+#   - Model seeded in MinIO + Redis
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference-server
+  namespace: fl-system
+  labels:
+    app: inference-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inference-server
+  template:
+    metadata:
+      labels:
+        app: inference-server
+    spec:
+      containers:
+        - name: inference-server
+          image: inference-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: PORT
+              value: "8000"
+            - name: REDIS_HOST
+              value: "redis-master"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: MINIO_ENDPOINT
+              value: "http://minio:9000"
+            - name: MINIO_ACCESS_KEY
+              value: "flminio"
+            - name: MINIO_SECRET_KEY
+              value: "flminio123"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inference-server
+  namespace: fl-system
+spec:
+  selector:
+    app: inference-server
+  ports:
+    - port: 8000
+      targetPort: http
+      protocol: TCP
+      name: http
+  type: ClusterIP
