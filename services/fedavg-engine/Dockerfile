@@ -15,4 +15,4 @@ COPY services/fedavg-engine/ ./services/fedavg-engine/
 
 EXPOSE 9093
 
-CMD ["python", "-m", "services.fedavg-engine.aggregator"]
+CMD ["python", "services/fedavg-engine/aggregator.py"]

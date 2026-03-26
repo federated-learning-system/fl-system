@@ -175,8 +175,9 @@ func (h *Handler) startRoundLogic(ctx context.Context) (string, string, error) {
 	uid := uuid.New().String()[:8]
 	roundID := "round-" + time.Now().Format("2006-01-02") + "-" + uid
 
-	// 3. Get current model version (default to v1.0.0)
-	modelVersion := "v1.0.0"
+	// 3. Model version — pass empty string so aggregation server resolves
+	//    the current version from Redis (model:current key).
+	modelVersion := ""
 
 	// 4. Set deadline 60 minutes from now
 	deadline := time.Now().Add(60 * time.Minute).Unix()

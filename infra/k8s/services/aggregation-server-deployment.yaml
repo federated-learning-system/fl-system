@@ -4,9 +4,8 @@
 # Deployment + Service for the FL Aggregation Server (gRPC + mTLS).
 #
 # Prerequisites:
+#   - fl-configmap, fl-credentials, fls-server-tls, fls-ca secrets applied
 #   - Redis and MinIO running in fl-system namespace
-#   - TLS secrets created (infra/k8s/secrets/tls-secrets.yaml)
-#   - aggregation-server image built
 
 apiVersion: apps/v1
 kind: Deployment
@@ -15,6 +14,7 @@ metadata:
   namespace: fl-system
   labels:
     app: aggregation-server
+    app.kubernetes.io/part-of: fls
 spec:
   replicas: 1
   selector:
@@ -34,29 +34,21 @@ spec:
               name: grpc
             - containerPort: 9090
               name: metrics
+          envFrom:
+            - configMapRef:
+                name: fl-common-config
+            - secretRef:
+                name: fl-credentials
           env:
             - name: GRPC_PORT
               value: "50051"
             - name: METRICS_PORT
               value: "9090"
-            - name: REDIS_ADDR
-              value: "redis-master:6379"
             - name: MINIO_ENDPOINT
-              value: "minio:9000"
-            - name: MINIO_ACCESS_KEY
-              value: "flminio"
-            - name: MINIO_SECRET_KEY
-              value: "flminio123"
-            - name: TLS_CERT
-              value: "/certs/server.crt"
-            - name: TLS_KEY
-              value: "/certs/server.key"
-            - name: TLS_CA
-              value: "/certs/ca.crt"
-            - name: REGISTRY_URL
-              value: "http://client-registry:8081"
-            - name: INFERENCE_URL
-              value: "http://inference-server:8000"
+              valueFrom:
+                configMapKeyRef:
+                  name: fl-common-config
+                  key: MINIO_ENDPOINT_RAW
           volumeMounts:
             - name: tls-certs
               mountPath: /certs
@@ -83,8 +75,12 @@ spec:
 
       volumes:
         - name: tls-certs
-          secret:
-            secretName: fl-tls-certs
+          projected:
+            sources:
+              - secret:
+                  name: fls-server-tls
+              - secret:
+                  name: fls-ca
 
 ---
 apiVersion: v1

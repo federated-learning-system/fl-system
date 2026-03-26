@@ -245,11 +245,24 @@ class FedAvgWorker:
         self.penalty_factor = float(os.environ.get("PENALTY_FACTOR", "0.5"))
         self.min_clients = int(os.environ.get("MIN_CLIENTS", "2"))
 
+    def _pubsub_connection(self):
+        """Create a dedicated Redis connection for pub/sub with no socket timeout."""
+        import redis as _redis
+        return _redis.Redis(
+            host=os.environ.get("REDIS_HOST", "localhost"),
+            port=int(os.environ.get("REDIS_PORT", "6379")),
+            db=0,
+            decode_responses=True,
+            socket_timeout=None,
+            socket_connect_timeout=10,
+        )
+
     def run(self) -> None:
         """Subscribe to round events and process ROUND_CLOSED."""
         log.info("FedAvg worker starting, subscribing to %s", keys.CHANNEL_ROUND_EVENTS)
 
-        pubsub = self.redis.pubsub()
+        sub_conn = self._pubsub_connection()
+        pubsub = sub_conn.pubsub()
         pubsub.subscribe(keys.CHANNEL_ROUND_EVENTS)
 
         for message in pubsub.listen():

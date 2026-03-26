@@ -44,7 +44,7 @@ async def test_websocket_push():
         assert count >= 1, f"expected at least 1 connection, got {count}"
 
         # Publish a MODEL_UPDATED event on Redis
-        r.publish("fl:model:events", json.dumps({
+        r.publish("fl:model:updated", json.dumps({
             "event": "MODEL_UPDATED",
             "payload": {
                 "version": "v1.0.1",

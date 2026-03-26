@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-frontend
+  namespace: fl-system
+  labels:
+    app: web-frontend
+    app.kubernetes.io/part-of: fls
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-frontend
+  template:
+    metadata:
+      labels:
+        app: web-frontend
+        app.kubernetes.io/part-of: fls
+    spec:
+      containers:
+        - name: web-frontend
+          image: web-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              name: http
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 2
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-frontend
+  namespace: fl-system
+  labels:
+    app: web-frontend
+    app.kubernetes.io/part-of: fls
+spec:
+  type: ClusterIP
+  selector:
+    app: web-frontend
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000

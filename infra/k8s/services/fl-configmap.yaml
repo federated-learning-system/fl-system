@@ -1,0 +1,48 @@
+---
+# infra/k8s/services/fl-configmap.yaml
+#
+# Shared ConfigMap for all FL services in fl-system namespace.
+# Contains non-sensitive infrastructure addresses and tuning params.
+#
+# Apply with: kubectl apply -f infra/k8s/services/fl-configmap.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fl-common-config
+  namespace: fl-system
+  labels:
+    app.kubernetes.io/part-of: fls
+data:
+  # ── Redis ──────────────────────────────────────────────────────────
+  REDIS_HOST: "redis-master"
+  REDIS_PORT: "6379"
+  REDIS_ADDR: "redis-master:6379"
+
+  # ── MinIO ──────────────────────────────────────────────────────────
+  MINIO_ENDPOINT: "http://minio:9000"
+  MINIO_ENDPOINT_RAW: "minio:9000"
+  MINIO_USE_SSL: "false"
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────
+  DB_HOST: "postgresql"
+  DB_PORT: "5432"
+  DB_NAME: "fl_registry"
+
+  # ── Service discovery ──────────────────────────────────────────────
+  AGG_GRPC_ADDR: "aggregation-server:50051"
+  REGISTRY_URL: "http://client-registry:8081"
+  INFERENCE_URL: "http://inference-server:8000"
+
+  # ── TLS cert paths (mounted from Secret volume) ────────────────────
+  TLS_CERT: "/certs/tls.crt"
+  TLS_KEY: "/certs/tls.key"
+  TLS_CA: "/certs/ca.crt"
+
+  # ── Orchestration tuning ───────────────────────────────────────────
+  MIN_CLIENTS_PER_ROUND: "2"
+  ROUND_INTERVAL_MINUTES: "60"
+
+  # ── FedAvg-R tuning ───────────────────────────────────────────────
+  PENALTY_FACTOR: "0.5"
+  MIN_CLIENTS: "2"

@@ -1,9 +1,10 @@
 ---
 # infra/k8s/services/websocket-push-deployment.yaml
 #
-# Deployment for the WebSocket Push Service.
+# Deployment + Service for the WebSocket Push Service.
 #
 # Prerequisites:
+#   - fl-configmap applied
 #   - Redis running in fl-system namespace
 
 apiVersion: apps/v1
@@ -13,6 +14,7 @@ metadata:
   namespace: fl-system
   labels:
     app: websocket-push
+    app.kubernetes.io/part-of: fls
 spec:
   replicas: 1
   selector:
@@ -30,11 +32,12 @@ spec:
           ports:
             - containerPort: 8080
               name: http
+          envFrom:
+            - configMapRef:
+                name: fl-common-config
           env:
             - name: PORT
               value: "8080"
-            - name: REDIS_ADDR
-              value: "redis-master:6379"
           livenessProbe:
             httpGet:
               path: /healthz
@@ -44,7 +47,7 @@ spec:
           resources:
             requests:
               cpu: 50m
-              memory: 64Mi
+              memory: 32Mi
             limits:
               cpu: 200m
               memory: 128Mi

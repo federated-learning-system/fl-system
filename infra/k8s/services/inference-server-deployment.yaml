@@ -1,9 +1,10 @@
 ---
 # infra/k8s/services/inference-server-deployment.yaml
 #
-# Deployment for the ONNX Inference Server.
+# Deployment + Service for the ONNX Inference Server.
 #
 # Prerequisites:
+#   - fl-configmap, fl-credentials applied
 #   - Redis and MinIO running in fl-system namespace
 #   - Model seeded in MinIO + Redis
 
@@ -14,6 +15,7 @@ metadata:
   namespace: fl-system
   labels:
     app: inference-server
+    app.kubernetes.io/part-of: fls
 spec:
   replicas: 1
   selector:
@@ -31,19 +33,14 @@ spec:
           ports:
             - containerPort: 8000
               name: http
+          envFrom:
+            - configMapRef:
+                name: fl-common-config
+            - secretRef:
+                name: fl-credentials
           env:
             - name: PORT
               value: "8000"
-            - name: REDIS_HOST
-              value: "redis-master"
-            - name: REDIS_PORT
-              value: "6379"
-            - name: MINIO_ENDPOINT
-              value: "http://minio:9000"
-            - name: MINIO_ACCESS_KEY
-              value: "flminio"
-            - name: MINIO_SECRET_KEY
-              value: "flminio123"
           livenessProbe:
             httpGet:
               path: /health
@@ -61,8 +58,8 @@ spec:
               cpu: 200m
               memory: 256Mi
             limits:
-              cpu: "1"
-              memory: 1Gi
+              cpu: 500m
+              memory: 512Mi
 
 ---
 apiVersion: v1

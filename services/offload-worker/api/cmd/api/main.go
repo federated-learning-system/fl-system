@@ -25,7 +25,7 @@ func main() {
 	// ── Config ──────────────────────────────────────────────────────
 	port := envOr("PORT", "8085")
 	redisAddr := envOr("REDIS_ADDR", "localhost:6379")
-	minioEndpoint := envOr("MINIO_ENDPOINT", "localhost:9000")
+	minioEndpoint := envOr("MINIO_ENDPOINT_RAW", envOr("MINIO_ENDPOINT", "localhost:9000"))
 	minioAccessKey := envOr("MINIO_ACCESS_KEY", "flminio")
 	minioSecretKey := envOr("MINIO_SECRET_KEY", "flminio123")
 	minioUseSSL := envOr("MINIO_USE_SSL", "false") == "true"

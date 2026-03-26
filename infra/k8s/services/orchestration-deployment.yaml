@@ -4,9 +4,8 @@
 # Deployment + Service for the FL Orchestration Controller.
 #
 # Prerequisites:
-#   - PostgreSQL running in fl-system namespace
-#   - aggregation-server running and reachable
-#   - TLS secrets created (infra/k8s/secrets/tls-secrets.yaml)
+#   - fl-configmap, fl-credentials, fls-client-tech-tls, fls-ca applied
+#   - PostgreSQL, aggregation-server running in fl-system namespace
 
 apiVersion: apps/v1
 kind: Deployment
@@ -15,6 +14,7 @@ metadata:
   namespace: fl-system
   labels:
     app: orchestration
+    app.kubernetes.io/part-of: fls
 spec:
   replicas: 1
   selector:
@@ -32,35 +32,22 @@ spec:
           ports:
             - containerPort: 8082
               name: http
+          envFrom:
+            - configMapRef:
+                name: fl-common-config
+            - secretRef:
+                name: fl-credentials
           env:
             - name: PORT
               value: "8082"
-            - name: DB_HOST
-              value: "postgresql"
-            - name: DB_PORT
-              value: "5432"
-            - name: DB_USER
-              value: "postgres"
-            - name: DB_PASSWORD
-              value: "flpg123"
-            - name: DB_NAME
-              value: "fl_registry"
-            - name: AGG_GRPC_ADDR
-              value: "aggregation-server:50051"
             - name: TLS_ENABLED
               value: "true"
             - name: TLS_CERT
-              value: "/certs/client-tech.crt"
+              value: "/certs/tls.crt"
             - name: TLS_KEY
-              value: "/certs/client-tech.key"
+              value: "/certs/tls.key"
             - name: TLS_CA
               value: "/certs/ca.crt"
-            - name: REGISTRY_URL
-              value: "http://client-registry:8081"
-            - name: MIN_CLIENTS_PER_ROUND
-              value: "2"
-            - name: ROUND_INTERVAL_MINUTES
-              value: "60"
           volumeMounts:
             - name: tls-certs
               mountPath: /certs
@@ -87,8 +74,12 @@ spec:
 
       volumes:
         - name: tls-certs
-          secret:
-            secretName: fl-tls-certs
+          projected:
+            sources:
+              - secret:
+                  name: fls-client-tech-tls
+              - secret:
+                  name: fls-ca
 
 ---
 apiVersion: v1

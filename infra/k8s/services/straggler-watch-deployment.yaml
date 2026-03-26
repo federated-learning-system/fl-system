@@ -1,9 +1,10 @@
 ---
 # infra/k8s/services/straggler-watch-deployment.yaml
 #
-# Deployment for the FL Straggler Watch service.
+# Deployment + Service for the FL Straggler Watch service.
 #
 # Prerequisites:
+#   - fl-configmap applied
 #   - Redis running in fl-system namespace
 
 apiVersion: apps/v1
@@ -13,6 +14,7 @@ metadata:
   namespace: fl-system
   labels:
     app: straggler-watch
+    app.kubernetes.io/part-of: fls
 spec:
   replicas: 1
   selector:
@@ -30,9 +32,10 @@ spec:
           ports:
             - containerPort: 9092
               name: metrics
+          envFrom:
+            - configMapRef:
+                name: fl-common-config
           env:
-            - name: REDIS_ADDR
-              value: "redis-master:6379"
             - name: METRICS_PORT
               value: "9092"
           livenessProbe:

@@ -7,6 +7,7 @@ COPY proto/aggregationv1/ ./proto/aggregationv1/
 COPY services/websocket-push/ ./services/websocket-push/
 
 WORKDIR /src/services/websocket-push
+ENV GOWORK=off
 RUN go build -o /websocket-push ./cmd/server
 
 # ── Final stage ──────────────────────────────────────────────────────────────

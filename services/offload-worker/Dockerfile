@@ -9,6 +9,7 @@ COPY proto/aggregationv1/ ./proto/aggregationv1/
 COPY services/offload-worker/api/ ./services/offload-worker/api/
 
 WORKDIR /src/services/offload-worker/api
+ENV GOWORK=off
 RUN go build -o /offload-api ./cmd/api
 
 # ── Stage 2: Final image (Python base + Go binary) ──────────────────────────

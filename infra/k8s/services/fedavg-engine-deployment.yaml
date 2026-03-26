@@ -1,9 +1,10 @@
 ---
 # infra/k8s/services/fedavg-engine-deployment.yaml
 #
-# Deployment for the FedAvg-R Aggregation Engine.
+# Deployment + Service for the FedAvg-R Aggregation Engine.
 #
 # Prerequisites:
+#   - fl-configmap, fl-credentials applied
 #   - Redis and MinIO running in fl-system namespace
 #   - Model seeded in MinIO + Redis
 
@@ -14,6 +15,7 @@ metadata:
   namespace: fl-system
   labels:
     app: fedavg-engine
+    app.kubernetes.io/part-of: fls
 spec:
   replicas: 1
   selector:
@@ -31,23 +33,14 @@ spec:
           ports:
             - containerPort: 9093
               name: metrics
+          envFrom:
+            - configMapRef:
+                name: fl-common-config
+            - secretRef:
+                name: fl-credentials
           env:
-            - name: REDIS_HOST
-              value: "redis-master"
-            - name: REDIS_PORT
-              value: "6379"
-            - name: MINIO_ENDPOINT
-              value: "http://minio:9000"
-            - name: MINIO_ACCESS_KEY
-              value: "flminio"
-            - name: MINIO_SECRET_KEY
-              value: "flminio123"
             - name: METRICS_PORT
               value: "9093"
-            - name: PENALTY_FACTOR
-              value: "0.5"
-            - name: MIN_CLIENTS
-              value: "2"
           livenessProbe:
             httpGet:
               path: /
@@ -60,7 +53,7 @@ spec:
               memory: 256Mi
             limits:
               cpu: "1"
-              memory: 1Gi
+              memory: 512Mi
 
 ---
 apiVersion: v1

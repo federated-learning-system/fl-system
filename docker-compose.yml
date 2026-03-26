@@ -1,20 +1,51 @@
-# docker-compose.yml — preliminary skeleton (Phase 3 will add full storage layer)
-# Usage: make up / make down
-version: "3.9"
+# docker-compose.yml — FLS federated learning infrastructure + services
+#
+# Tiers:
+#   infra:    redis, minio, postgres       — always up with `make up`
+#   services: 8 FL services                — start with `docker compose --profile services up`
+#   clients:  5 simulated FL clients       — via overlay: `make up-all`
+#
+# Usage:
+#   make up           — infra only
+#   make up-services  — infra + all 8 services
+#   make up-all       — infra + services + 5 clients (uses infra/docker-compose.clients.yml)
+#   make down         — tear down everything
 
-# ─── Shared network ───────────────────────────────────────────────────────────
 networks:
   fl-net:
     driver: bridge
 
-# ─── Shared volumes ───────────────────────────────────────────────────────────
 volumes:
   redis-data:
   minio-data:
   postgres-data:
 
+# ── Shared environment anchors ────────────────────────────────────────────────
+x-common-env: &common-env
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  REDIS_ADDR: "redis:6379"
+  MINIO_ENDPOINT: "http://minio:9000"
+  MINIO_ENDPOINT_RAW: "minio:9000"
+  MINIO_USE_SSL: "false"
+  MINIO_ACCESS_KEY: "minioadmin"
+  MINIO_SECRET_KEY: "minioadmin"
+  MINIO_BUCKET_MODELS: "fl-models"
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "fl_registry"
+  DB_USER: "postgres"
+  DB_PASSWORD: "flpg123"
+  JWT_SECRET: "fl-dev-secret-change-in-prod"
+  AGG_GRPC_ADDR: "aggregation-server:50051"
+  REGISTRY_URL: "http://client-registry:8081"
+  INFERENCE_URL: "http://inference-server:8000"
+
 services:
-  # ── Infrastructure (Phase 3) ────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Infrastructure (always started)
+  # ═══════════════════════════════════════════════════════════════════════════
+
   redis:
     image: redis:7-alpine
     networks: [fl-net]
@@ -57,49 +88,105 @@ services:
       interval: 5s
       retries: 5
 
-  # ── Go services (Phase 4+) — stubs, not yet built ──────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Go services (profile: services)
+  # ═══════════════════════════════════════════════════════════════════════════
+
   aggregation-server:
-    build:
-      context: .
-      dockerfile: services/aggregation-server/Dockerfile
+    image: aggregation-server:${IMAGE_TAG:-latest}
     networks: [fl-net]
+    environment:
+      <<: *common-env
+    ports:
+      - "50051:50051"
+      - "9090:9090"
     depends_on:
-      redis: {condition: service_healthy}
-      minio: {condition: service_healthy}
+      redis:    {condition: service_healthy}
+      minio:    {condition: service_healthy}
       postgres: {condition: service_healthy}
-    profiles: ["services"]   # only start with: docker compose --profile services up
+    profiles: ["services"]
 
   client-registry:
-    build:
-      context: .
-      dockerfile: services/client-registry/Dockerfile
+    image: client-registry:${IMAGE_TAG:-latest}
     networks: [fl-net]
+    environment:
+      <<: *common-env
+    ports:
+      - "8081:8081"
     depends_on:
       postgres: {condition: service_healthy}
     profiles: ["services"]
 
   orchestration:
-    build:
-      context: .
-      dockerfile: services/orchestration/Dockerfile
+    image: orchestration:${IMAGE_TAG:-latest}
     networks: [fl-net]
+    environment:
+      <<: *common-env
+      MIN_CLIENTS_PER_ROUND: "2"
+      ROUND_INTERVAL_MINUTES: "60"
     depends_on:
       redis: {condition: service_healthy}
     profiles: ["services"]
 
-  # ── Python ML services (Phase 5+) ──────────────────────────────────────────
-  fedavg-engine:
-    build:
-      context: .
-      dockerfile: services/fedavg-engine/Dockerfile
+  straggler-watch:
+    image: straggler-watch:${IMAGE_TAG:-latest}
     networks: [fl-net]
+    environment:
+      <<: *common-env
     depends_on:
+      redis: {condition: service_healthy}
+    profiles: ["services"]
+
+  websocket-push:
+    image: websocket-push:${IMAGE_TAG:-latest}
+    networks: [fl-net]
+    environment:
+      <<: *common-env
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis: {condition: service_healthy}
+    profiles: ["services"]
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Python ML services (profile: services)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  fedavg-engine:
+    image: fedavg-engine:${IMAGE_TAG:-latest}
+    networks: [fl-net]
+    environment:
+      <<: *common-env
+      PENALTY_FACTOR: "0.5"
+      MIN_CLIENTS: "2"
+    depends_on:
+      redis: {condition: service_healthy}
       minio: {condition: service_healthy}
-    profiles: ["ml"]
+    profiles: ["services"]
 
   inference-server:
-    build:
-      context: .
-      dockerfile: services/inference-server/Dockerfile
+    image: inference-server:${IMAGE_TAG:-latest}
     networks: [fl-net]
-    profiles: ["ml"]
+    environment:
+      <<: *common-env
+    ports:
+      - "8000:8000"
+    depends_on:
+      minio: {condition: service_healthy}
+    profiles: ["services"]
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Hybrid service (profile: services)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  offload-worker:
+    image: offload-worker:${IMAGE_TAG:-latest}
+    networks: [fl-net]
+    environment:
+      <<: *common-env
+    ports:
+      - "8085:8085"
+    depends_on:
+      redis: {condition: service_healthy}
+      minio: {condition: service_healthy}
+    profiles: ["services"]

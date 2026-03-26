@@ -2,21 +2,18 @@
 # ── Build stage ──────────────────────────────────────────────────────────────
 FROM fl-base-go:latest AS builder
 
-WORKDIR /app
+WORKDIR /src
 
-# Copy workspace files for module resolution
-COPY go.work ./
-COPY proto/aggregationv1/go.mod proto/aggregationv1/go.sum ./proto/aggregationv1/
-COPY proto/aggregationv1/*.go ./proto/aggregationv1/
+# Copy proto module (referenced by replace directive in go.mod)
+COPY proto/aggregationv1/ ./proto/aggregationv1/
 
 # Copy service source
-COPY services/straggler-watch/go.mod services/straggler-watch/go.sum ./services/straggler-watch/
-RUN cd services/straggler-watch && go mod download
-
 COPY services/straggler-watch/ ./services/straggler-watch/
 
-RUN cd services/straggler-watch && \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/straggler-watch ./cmd/watcher/
+WORKDIR /src/services/straggler-watch
+ENV GOWORK=off
+RUN go mod download
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/straggler-watch ./cmd/watcher/
 
 # ── Final stage ──────────────────────────────────────────────────────────────
 FROM gcr.io/distroless/static:nonroot

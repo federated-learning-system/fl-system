@@ -11,7 +11,7 @@ import (
 
 const (
 	ChannelRoundEvents  = "fl:round:events"
-	ChannelModelUpdated = "fl:model:events"
+	ChannelModelUpdated = "fl:model:updated"
 )
 
 // Subscriber listens to Redis Pub/Sub channels and forwards messages
