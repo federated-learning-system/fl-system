@@ -60,6 +60,7 @@ install_redis() {
         --set master.persistence.enabled=true \
         --set master.persistence.size=1Gi \
         --set replica.replicaCount=0 \
+        --set master.configuration="maxmemory 200mb\nmaxmemory-policy allkeys-lru" \
         --wait --timeout=120s
     echo "    Redis OK"
 }

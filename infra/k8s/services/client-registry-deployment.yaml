@@ -32,6 +32,8 @@ spec:
           ports:
             - containerPort: 8081
               name: http
+            - containerPort: 9100
+              name: metrics
           envFrom:
             - configMapRef:
                 name: fl-common-config
@@ -74,4 +76,8 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    - port: 9100
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
   type: ClusterIP

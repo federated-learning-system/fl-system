@@ -1,0 +1,138 @@
+# monitoring/grafana/alert-rules.yaml
+#
+# PrometheusRule CRD for kube-prometheus-stack.
+# Defines alerting rules for the FL system on memory-constrained hardware.
+#
+# Apply with: kubectl apply -f monitoring/grafana/alert-rules.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: fl-alerts
+  namespace: fl-system
+  labels:
+    app.kubernetes.io/part-of: fls
+    release: monitoring
+spec:
+  groups:
+    # ── Node-level alerts ────────────────────────────────────────────────────
+    - name: fl-node
+      rules:
+        - alert: MemoryPressure
+          expr: |
+            (
+              1 - (
+                node_memory_MemAvailable_bytes
+                / node_memory_MemTotal_bytes
+              )
+            ) > 0.90
+          for: 2m
+          labels:
+            severity: critical
+            service: infrastructure
+          annotations:
+            summary: "Node memory usage above 90% for 2+ minutes"
+            description: >-
+              Node {{ $labels.instance }} is at
+              {{ $value | humanizePercentage }} memory utilisation.
+              On a 7.2 GB machine this leaves < 720 MB free — risk of
+              OOM kills across FL pods.
+            runbook: "Scale down non-critical pods or increase node memory."
+
+    # ── Pod-level alerts ─────────────────────────────────────────────────────
+    - name: fl-pods
+      rules:
+        - alert: PodOOMKilled
+          expr: |
+            kube_pod_container_status_last_terminated_reason{
+              namespace="fl-system",
+              reason="OOMKilled"
+            } > 0
+          for: 0m
+          labels:
+            severity: critical
+            service: "{{ $labels.container }}"
+          annotations:
+            summary: "Pod OOMKilled in fl-system namespace"
+            description: >-
+              Container {{ $labels.container }} in pod
+              {{ $labels.pod }} was OOMKilled. Current memory limit
+              may be too low for the workload. Check resource-check.sh
+              output and consider raising limits.
+            runbook: >-
+              1. kubectl describe pod {{ $labels.pod }} -n fl-system
+              2. bash infra/k8s/resource-check.sh
+              3. Raise resources.limits.memory in the deployment YAML
+
+    # ── FL round health ──────────────────────────────────────────────────────
+    - name: fl-rounds
+      rules:
+        - alert: RoundFailedNoClients
+          expr: |
+            increase(fl_rounds_closed_total[5m]) > 0
+              and
+            increase(fl_updates_accepted_total[5m]) == 0
+          for: 0m
+          labels:
+            severity: warning
+            service: orchestration
+          annotations:
+            summary: "FL round completed with 0 accepted client updates"
+            description: >-
+              A round was closed but no client updates were accepted.
+              This means the aggregation will have no data to work with.
+              Possible causes: all clients straggled, budget exhausted,
+              or network partition.
+            runbook: >-
+              1. Check client-registry for active clients
+              2. Check fl_updates_rejected_total for rejection reasons
+              3. Verify WebSocket push is broadcasting ROUND_OPEN events
+
+        - alert: AggregationFailing
+          expr: |
+            increase(fl_rounds_failed_total[10m]) > 0
+          for: 0m
+          labels:
+            severity: warning
+            service: fedavg-engine
+          annotations:
+            summary: "FedAvg aggregation failed"
+            description: >-
+              The FedAvg engine reported a failed aggregation in the
+              last 10 minutes. Check fedavg-engine logs for details.
+            runbook: >-
+              kubectl logs -n fl-system deploy/fedavg-engine --tail=100
+
+        - alert: HighStragglerRate
+          expr: |
+            increase(fl_rounds_closed_by_deadline_total[30m])
+              /
+            increase(fl_rounds_closed_total[30m]) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+            service: straggler-watch
+          annotations:
+            summary: "More than 50% of rounds closed by straggler deadline"
+            description: >-
+              Over the last 30 minutes, {{ $value | humanizePercentage }}
+              of rounds were force-closed by straggler-watch rather than
+              completing normally. Consider extending the round deadline
+              or investigating slow clients.
+
+    # ── Offload worker health ────────────────────────────────────────────────
+    - name: fl-offload
+      rules:
+        - alert: OffloadQueueBacklog
+          expr: fl_offload_jobs_queued > 5
+          for: 5m
+          labels:
+            severity: warning
+            service: offload-worker
+          annotations:
+            summary: "Offload job queue depth > 5 for 5+ minutes"
+            description: >-
+              {{ $value }} offload jobs are queued. The worker may be
+              unable to keep up with incoming ESP32 offload requests.
+              Consider scaling the offload-worker deployment.

@@ -31,7 +31,7 @@ spec:
           image: fedavg-engine:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 9093
+            - containerPort: 9100
               name: metrics
           envFrom:
             - configMapRef:
@@ -40,7 +40,7 @@ spec:
                 name: fl-credentials
           env:
             - name: METRICS_PORT
-              value: "9093"
+              value: "9100"
           livenessProbe:
             httpGet:
               path: /
@@ -65,7 +65,7 @@ spec:
   selector:
     app: fedavg-engine
   ports:
-    - port: 9093
+    - port: 9100
       targetPort: metrics
       protocol: TCP
       name: metrics

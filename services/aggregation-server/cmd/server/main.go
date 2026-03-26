@@ -28,7 +28,7 @@ func main() {
 
 	// ── Config ──────────────────────────────────────────────────────
 	grpcPort := envOr("GRPC_PORT", "50051")
-	metricsPort := envOr("METRICS_PORT", "9090")
+	metricsPort := envOr("METRICS_PORT", "9100")
 	redisAddr := envOr("REDIS_ADDR", "localhost:6379")
 	minioEndpoint := envOr("MINIO_ENDPOINT", "localhost:9000")
 	minioAccessKey := envOr("MINIO_ACCESS_KEY", "flminio")

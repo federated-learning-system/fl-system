@@ -71,6 +71,11 @@ rounds_failed = Counter(
     "Total number of rounds that failed aggregation",
 )
 
+model_version_current = Gauge(
+    "fl_model_version_current",
+    "Numeric representation of the current global model version (patch number)",
+)
+
 
 # ── Core FedAvg-R ────────────────────────────────────────────────────────────
 
@@ -385,6 +390,13 @@ class FedAvgWorker:
             aggregation_duration.observe(elapsed)
             rounds_aggregated.inc()
 
+            # Update model version gauge (extract numeric patch from vX.Y.Z)
+            try:
+                patch = int(new_version.lstrip("v").split(".")[-1])
+                model_version_current.set(patch)
+            except (ValueError, IndexError):
+                pass
+
             log.info(
                 "Round %s aggregated: %d clients → %s (%.1fs)",
                 round_id, len(updates), new_version, elapsed,
@@ -450,7 +462,7 @@ def main() -> None:
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
 
-    metrics_port = int(os.environ.get("METRICS_PORT", "9093"))
+    metrics_port = int(os.environ.get("METRICS_PORT", "9100"))
     start_http_server(metrics_port)
     log.info("Prometheus metrics on :%d", metrics_port)
 

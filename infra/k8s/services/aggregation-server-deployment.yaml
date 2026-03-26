@@ -32,7 +32,7 @@ spec:
           ports:
             - containerPort: 50051
               name: grpc
-            - containerPort: 9090
+            - containerPort: 9100
               name: metrics
           envFrom:
             - configMapRef:
@@ -43,7 +43,7 @@ spec:
             - name: GRPC_PORT
               value: "50051"
             - name: METRICS_PORT
-              value: "9090"
+              value: "9100"
             - name: MINIO_ENDPOINT
               valueFrom:
                 configMapKeyRef:
@@ -96,7 +96,7 @@ spec:
       targetPort: grpc
       protocol: TCP
       name: grpc
-    - port: 9090
+    - port: 9100
       targetPort: metrics
       protocol: TCP
       name: metrics

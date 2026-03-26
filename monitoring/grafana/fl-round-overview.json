@@ -1,0 +1,369 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "9.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus" },
+    { "type": "panel", "id": "timeseries", "name": "Time series" },
+    { "type": "panel", "id": "gauge", "name": "Gauge" },
+    { "type": "panel", "id": "barchart", "name": "Bar chart" },
+    { "type": "panel", "id": "histogram", "name": "Histogram" },
+    { "type": "panel", "id": "table", "name": "Table" }
+  ],
+  "id": null,
+  "uid": "fl-round-overview",
+  "title": "FL Round Overview",
+  "description": "Federated learning round lifecycle: state transitions, participation, acceptance rates, and latency",
+  "tags": ["federated-learning", "fls"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-1h", "to": "now" },
+  "fiscalYearStartMonth": 0,
+  "liveNow": false,
+  "editable": true,
+  "style": "dark",
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Round State Timeline",
+      "description": "Active round indicator from orchestration controller (1 = round in progress, 0 = idle)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "fillOpacity": 30,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "lineWidth": 2,
+            "spanNulls": false,
+            "axisCenteredZero": false,
+            "stacking": { "mode": "none" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "min": 0,
+          "max": 1,
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "single", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr": "fl_active_round",
+          "legendFormat": "Round Active",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(fl_rounds_started_total[5m]) * 300",
+          "legendFormat": "Rounds Started (5m window)",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Participating Clients",
+      "description": "Number of clients that submitted updates in the current round",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "yellow", "value": 3 },
+              { "color": "green", "value": 5 }
+            ]
+          },
+          "min": 0,
+          "max": 10
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "expr": "fl_participating_clients",
+          "legendFormat": "Participating Clients",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Rounds Started / Closed",
+      "description": "Cumulative count of rounds started and closed by orchestration",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "spanNulls": false,
+            "stacking": { "mode": "none" }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr": "fl_rounds_started_total",
+          "legendFormat": "Started",
+          "refId": "A"
+        },
+        {
+          "expr": "fl_rounds_closed_total",
+          "legendFormat": "Closed",
+          "refId": "B"
+        },
+        {
+          "expr": "fl_rounds_closed_by_deadline_total",
+          "legendFormat": "Closed by Deadline (Straggler)",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Updates Accepted vs Rejected",
+      "description": "Rate of accepted and rejected client updates (per reason)",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "showValue": "auto",
+            "stacking": "normal"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Accepted" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "auto",
+        "barRadius": 0.1,
+        "groupWidth": 0.7,
+        "barWidth": 0.8,
+        "xTickLabelRotation": 0,
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "increase(fl_updates_accepted_total[5m])",
+          "legendFormat": "Accepted",
+          "refId": "A"
+        },
+        {
+          "expr": "increase(fl_updates_rejected_total[5m])",
+          "legendFormat": "Rejected ({{reason}})",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Round Latency Distribution",
+      "description": "Histogram of FL round durations in seconds",
+      "type": "histogram",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "scheme",
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "bucketOffset": 0,
+        "combine": false,
+        "fillOpacity": 80,
+        "gradientMode": "scheme",
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "rate(fl_round_duration_seconds_bucket[10m])",
+          "legendFormat": "{{le}}",
+          "format": "heatmap",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Round History",
+      "description": "Tabular view of recent round activity: rates, stragglers, and participation",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Value #A" },
+            "properties": [{ "id": "displayName", "value": "Rounds Started" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Value #B" },
+            "properties": [{ "id": "displayName", "value": "Rounds Closed" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Value #C" },
+            "properties": [{ "id": "displayName", "value": "Updates Accepted" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Value #D" },
+            "properties": [{ "id": "displayName", "value": "Updates Rejected" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Value #E" },
+            "properties": [{ "id": "displayName", "value": "Stragglers" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Value #F" },
+            "properties": [{ "id": "displayName", "value": "Participating Clients" }]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": { "show": false },
+        "frameIndex": 0
+      },
+      "transformations": [
+        { "id": "merge", "options": {} }
+      ],
+      "targets": [
+        {
+          "expr": "fl_rounds_started_total",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "fl_rounds_closed_total",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        },
+        {
+          "expr": "fl_updates_accepted_total",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "C"
+        },
+        {
+          "expr": "sum(fl_updates_rejected_total)",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "D"
+        },
+        {
+          "expr": "fl_stragglers_total",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "E"
+        },
+        {
+          "expr": "fl_participating_clients",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "F"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "Prometheus", "value": "Prometheus" },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "DS_PROMETHEUS",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  }
+}

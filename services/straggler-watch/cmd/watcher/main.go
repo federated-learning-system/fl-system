@@ -21,7 +21,7 @@ func main() {
 
 	// ── Config ──────────────────────────────────────────────────────
 	redisAddr := envOr("REDIS_ADDR", "localhost:6379")
-	metricsPort := envOr("METRICS_PORT", "9092")
+	metricsPort := envOr("METRICS_PORT", "9100")
 
 	// ── Redis ───────────────────────────────────────────────────────
 	rdb := redis.NewClient(&redis.Options{

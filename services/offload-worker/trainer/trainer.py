@@ -39,6 +39,7 @@ from typing import Any
 
 import torch
 import torch.nn as nn
+from prometheus_client import Counter, Histogram, Gauge, start_http_server
 
 # ── Path setup ───────────────────────────────────────────────────────────────
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -57,6 +58,29 @@ from ml.model.model_config import ModelConfig
 from ml.dp_engine.dp_engine import DPEngine
 
 log = logging.getLogger("offload-trainer")
+
+# ── Prometheus metrics ───────────────────────────────────────────────────────
+
+offload_jobs_queued = Gauge(
+    "fl_offload_jobs_queued",
+    "Number of offload training jobs currently queued (trainer view)",
+)
+
+offload_job_duration = Histogram(
+    "fl_offload_job_duration_seconds",
+    "Duration of offload training jobs",
+    buckets=[5, 10, 30, 60, 120, 300, 600],
+)
+
+offload_jobs_completed = Counter(
+    "fl_offload_jobs_completed_total",
+    "Total number of offload training jobs completed",
+)
+
+offload_jobs_failed = Counter(
+    "fl_offload_jobs_failed_total",
+    "Total number of offload training jobs that failed",
+)
 
 # ── Constants ────────────────────────────────────────────────────────────────
 STREAM_KEY = "fl:offload:jobs"
@@ -497,15 +521,27 @@ class OffloadTrainer:
         job_id = fields.get("job_id", "unknown")
 
         log.info("Processing job %s (device=%s)", job_id, device_class)
+        offload_jobs_queued.inc()
+        t0 = time.monotonic()
 
-        if device_class in ("LAPTOP_SIM", "ANDROID"):
-            train_laptop_sim(fields, self.redis)
-        elif device_class == "ESP32":
-            train_esp32(fields, self.redis)
-        else:
-            log.warning("Unknown device class: %s", device_class)
-            status_key = f"offload:job:{job_id}:status"
-            self.redis.set(status_key, "FAILED", ex=3600)
+        try:
+            if device_class in ("LAPTOP_SIM", "ANDROID"):
+                train_laptop_sim(fields, self.redis)
+            elif device_class == "ESP32":
+                train_esp32(fields, self.redis)
+            else:
+                log.warning("Unknown device class: %s", device_class)
+                status_key = f"offload:job:{job_id}:status"
+                self.redis.set(status_key, "FAILED", ex=3600)
+                offload_jobs_failed.inc()
+                return
+            offload_jobs_completed.inc()
+        except Exception as e:
+            log.error("Job %s failed: %s", job_id, e, exc_info=True)
+            offload_jobs_failed.inc()
+        finally:
+            offload_job_duration.observe(time.monotonic() - t0)
+            offload_jobs_queued.dec()
 
         # Acknowledge message
         self.redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
@@ -518,6 +554,10 @@ def main() -> None:
         level=logging.INFO,
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
+
+    metrics_port = int(os.environ.get("METRICS_PORT", "9100"))
+    start_http_server(metrics_port)
+    log.info("Prometheus metrics on :%d", metrics_port)
 
     trainer = OffloadTrainer()
     trainer.run()

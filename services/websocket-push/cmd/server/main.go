@@ -9,10 +9,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/x9z0/fls/websocket-push/internal/handler"
 	"github.com/x9z0/fls/websocket-push/internal/hub"
+	_ "github.com/x9z0/fls/websocket-push/internal/metrics" // register metrics
 	"github.com/x9z0/fls/websocket-push/internal/redissub"
 )
 
@@ -22,6 +24,7 @@ func main() {
 
 	// ── Config ──────────────────────────────────────────────────────
 	port := envOr("PORT", "8080")
+	metricsPort := envOr("METRICS_PORT", "9100")
 	redisAddr := envOr("REDIS_ADDR", "localhost:6379")
 
 	// ── Redis ───────────────────────────────────────────────────────
@@ -54,6 +57,24 @@ func main() {
 	go func() {
 		if err := sub.Run(runCtx); err != nil && err != context.Canceled {
 			log.Error("subscriber error", "error", err)
+		}
+	}()
+
+	// ── Prometheus metrics endpoint ─────────────────────────────────
+	go func() {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", promhttp.Handler())
+		metricsMux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			if err := rdb.Ping(r.Context()).Err(); err != nil {
+				http.Error(w, "unhealthy", http.StatusServiceUnavailable)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("ok"))
+		})
+		log.Info("metrics server listening", "port", metricsPort)
+		if err := http.ListenAndServe(":"+metricsPort, metricsMux); err != nil {
+			log.Error("metrics server error", "error", err)
 		}
 	}()
 

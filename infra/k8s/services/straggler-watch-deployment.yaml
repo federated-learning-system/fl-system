@@ -30,14 +30,14 @@ spec:
           image: straggler-watch:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 9092
+            - containerPort: 9100
               name: metrics
           envFrom:
             - configMapRef:
                 name: fl-common-config
           env:
             - name: METRICS_PORT
-              value: "9092"
+              value: "9100"
           livenessProbe:
             httpGet:
               path: /healthz
@@ -68,7 +68,7 @@ spec:
   selector:
     app: straggler-watch
   ports:
-    - port: 9092
+    - port: 9100
       targetPort: metrics
       protocol: TCP
       name: metrics
