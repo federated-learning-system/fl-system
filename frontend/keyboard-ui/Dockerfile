@@ -12,10 +12,25 @@ RUN npm run build
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# SPA fallback: route all paths to index.html
+# nginx config: SPA fallback + API proxy
 RUN printf 'server {\n\
   listen 3000;\n\
   root /usr/share/nginx/html;\n\
+  client_max_body_size 2m;\n\
+\n\
+  # Proxy /api/client/ to web-bridge sidecar\n\
+  location /api/client/ {\n\
+    proxy_pass http://127.0.0.1:8090/;\n\
+    proxy_set_header Host $host;\n\
+  }\n\
+\n\
+  # Proxy /api/ to Inference Server\n\
+  location /api/ {\n\
+    proxy_pass http://inference-server:8000/;\n\
+    proxy_set_header Host $host;\n\
+  }\n\
+\n\
+  # SPA fallback\n\
   location / {\n\
     try_files $uri $uri/ /index.html;\n\
   }\n\
