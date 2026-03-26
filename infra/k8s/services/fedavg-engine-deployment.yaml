@@ -1,0 +1,72 @@
+---
+# infra/k8s/services/fedavg-engine-deployment.yaml
+#
+# Deployment + Service for the FedAvg-R Aggregation Engine.
+#
+# Prerequisites:
+#   - fl-configmap, fl-credentials applied
+#   - Redis and MinIO running in fl-system namespace
+#   - Model seeded in MinIO + Redis
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fedavg-engine
+  namespace: fl-system
+  labels:
+    app: fedavg-engine
+    app.kubernetes.io/part-of: fls
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fedavg-engine
+  template:
+    metadata:
+      labels:
+        app: fedavg-engine
+    spec:
+      containers:
+        - name: fedavg-engine
+          image: fedavg-engine:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9093
+              name: metrics
+          envFrom:
+            - configMapRef:
+                name: fl-common-config
+            - secretRef:
+                name: fl-credentials
+          env:
+            - name: METRICS_PORT
+              value: "9093"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fedavg-engine
+  namespace: fl-system
+spec:
+  selector:
+    app: fedavg-engine
+  ports:
+    - port: 9093
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  type: ClusterIP

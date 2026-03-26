@@ -1,0 +1,78 @@
+---
+# infra/k8s/services/offload-worker-deployment.yaml
+#
+# Deployment + Service for the Offload Worker (Go API + Python Trainer).
+#
+# Prerequisites:
+#   - fl-configmap, fl-credentials applied
+#   - Redis and MinIO running in fl-system namespace
+#   - Model seeded in MinIO
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: offload-worker
+  namespace: fl-system
+  labels:
+    app: offload-worker
+    app.kubernetes.io/part-of: fls
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: offload-worker
+  template:
+    metadata:
+      labels:
+        app: offload-worker
+    spec:
+      containers:
+        - name: offload-worker
+          image: offload-worker:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8085
+              name: http
+          envFrom:
+            - configMapRef:
+                name: fl-common-config
+            - secretRef:
+                name: fl-credentials
+          env:
+            - name: PORT
+              value: "8085"
+            - name: TLS_ENABLED
+              value: "false"
+            - name: CONSUMER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: offload-worker
+  namespace: fl-system
+spec:
+  selector:
+    app: offload-worker
+  ports:
+    - port: 8085
+      targetPort: http
+      protocol: TCP
+      name: http
+  type: ClusterIP

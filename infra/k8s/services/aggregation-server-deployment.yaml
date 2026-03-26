@@ -1,0 +1,103 @@
+---
+# infra/k8s/services/aggregation-server-deployment.yaml
+#
+# Deployment + Service for the FL Aggregation Server (gRPC + mTLS).
+#
+# Prerequisites:
+#   - fl-configmap, fl-credentials, fls-server-tls, fls-ca secrets applied
+#   - Redis and MinIO running in fl-system namespace
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aggregation-server
+  namespace: fl-system
+  labels:
+    app: aggregation-server
+    app.kubernetes.io/part-of: fls
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aggregation-server
+  template:
+    metadata:
+      labels:
+        app: aggregation-server
+    spec:
+      containers:
+        - name: aggregation-server
+          image: aggregation-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 50051
+              name: grpc
+            - containerPort: 9090
+              name: metrics
+          envFrom:
+            - configMapRef:
+                name: fl-common-config
+            - secretRef:
+                name: fl-credentials
+          env:
+            - name: GRPC_PORT
+              value: "50051"
+            - name: METRICS_PORT
+              value: "9090"
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: fl-common-config
+                  key: MINIO_ENDPOINT_RAW
+          volumeMounts:
+            - name: tls-certs
+              mountPath: /certs
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+
+      volumes:
+        - name: tls-certs
+          projected:
+            sources:
+              - secret:
+                  name: fls-server-tls
+              - secret:
+                  name: fls-ca
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aggregation-server
+  namespace: fl-system
+spec:
+  selector:
+    app: aggregation-server
+  ports:
+    - port: 50051
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+    - port: 9090
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  type: ClusterIP

@@ -1,0 +1,98 @@
+---
+# infra/k8s/services/orchestration-deployment.yaml
+#
+# Deployment + Service for the FL Orchestration Controller.
+#
+# Prerequisites:
+#   - fl-configmap, fl-credentials, fls-client-tech-tls, fls-ca applied
+#   - PostgreSQL, aggregation-server running in fl-system namespace
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestration
+  namespace: fl-system
+  labels:
+    app: orchestration
+    app.kubernetes.io/part-of: fls
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orchestration
+  template:
+    metadata:
+      labels:
+        app: orchestration
+    spec:
+      containers:
+        - name: orchestration
+          image: orchestration:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8082
+              name: http
+          envFrom:
+            - configMapRef:
+                name: fl-common-config
+            - secretRef:
+                name: fl-credentials
+          env:
+            - name: PORT
+              value: "8082"
+            - name: TLS_ENABLED
+              value: "true"
+            - name: TLS_CERT
+              value: "/certs/tls.crt"
+            - name: TLS_KEY
+              value: "/certs/tls.key"
+            - name: TLS_CA
+              value: "/certs/ca.crt"
+          volumeMounts:
+            - name: tls-certs
+              mountPath: /certs
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+      volumes:
+        - name: tls-certs
+          projected:
+            sources:
+              - secret:
+                  name: fls-client-tech-tls
+              - secret:
+                  name: fls-ca
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestration
+  namespace: fl-system
+spec:
+  selector:
+    app: orchestration
+  ports:
+    - port: 8082
+      targetPort: http
+      protocol: TCP
+      name: http
+  type: ClusterIP

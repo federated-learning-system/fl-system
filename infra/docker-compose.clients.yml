@@ -1,0 +1,143 @@
+# infra/docker-compose.clients.yml — 5 simulated FL clients
+#
+# Each client has:
+#   - Distinct PROFILE (tech, casual, medical, sports, mixed)
+#   - Synthetic dataset mounted from data/ via bind mount
+#   - Per-profile mTLS client cert from infra/certs/
+#   - Global model weights from ml/training/
+#   - Resource limits sized for the 7.2 GB RAM budget
+#
+# The straggler client (client-straggler) gets 0.1 CPU to deliberately lag behind.
+#
+# Usage (standalone):
+#   docker compose -f docker-compose.yml -f infra/docker-compose.clients.yml up -d
+#
+# Usage (via Makefile):
+#   make up-all      # infra + services + clients
+#   make down-all
+
+x-client-base: &client-base
+  image: fl-client:${IMAGE_TAG:-latest}
+  networks: [fl-net]
+  restart: unless-stopped
+  depends_on:
+    aggregation-server: {condition: service_started}
+    client-registry:    {condition: service_started}
+    websocket-push:     {condition: service_started}
+    redis:              {condition: service_healthy}
+    minio:              {condition: service_healthy}
+  volumes:
+    - ./data:/data:ro
+    - ./ml/training:/models:ro
+  environment: &client-env
+    # ── Service discovery (matches fl-configmap.yaml) ──
+    AGG_GRPC_ADDR: "aggregation-server:50051"
+    REGISTRY_URL: "http://client-registry:8081"
+    WEBSOCKET_URL: "ws://websocket-push:8080/ws"
+    INFERENCE_URL: "http://inference-server:8000"
+    MINIO_ENDPOINT: "http://minio:9000"
+    MINIO_ACCESS_KEY: "minioadmin"
+    MINIO_SECRET_KEY: "minioadmin"
+    MINIO_BUCKET_MODELS: "fl-models"
+    # ── Paths inside container ──
+    DATA_DIR: "/data"
+    MODEL_WEIGHTS_PATH: "/models/warmstart_final.pt"
+    # ── TLS (disabled for Docker Compose local testing) ──
+    TLS_ENABLED: "false"
+    # ── Training defaults ──
+    DEVICE_CLASS: "LAPTOP_SIM"
+    LOCAL_EPOCHS: "1"
+    BATCH_SIZE: "32"
+    FEDPROX_MU: "0.01"
+    LEARNING_RATE: "1e-3"
+    # ── DP defaults ──
+    DP_CLIP_NORM: "1.0"
+    DP_NOISE_MULTIPLIER: "1.1"
+    DP_TARGET_EPSILON: "1.0"
+    DP_TARGET_DELTA: "1e-5"
+
+services:
+  # ── Client 1: tech (desktop power user) ─────────────────────────────────────
+  client-tech:
+    <<: *client-base
+    container_name: fl-client-tech
+    environment:
+      <<: *client-env
+      CLIENT_ID: "client-tech"
+      PROFILE: "tech"
+      SIM_BATTERY_PCT: "95"
+      SIM_CPU_IDLE_PCT: "70"
+      SIM_MEMORY_FREE_MB: "4096"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 400M
+
+  # ── Client 2: casual (phone user) ──────────────────────────────────────────
+  client-casual:
+    <<: *client-base
+    container_name: fl-client-casual
+    environment:
+      <<: *client-env
+      CLIENT_ID: "client-casual"
+      PROFILE: "casual"
+      SIM_BATTERY_PCT: "60"
+      SIM_CPU_IDLE_PCT: "50"
+      SIM_MEMORY_FREE_MB: "2048"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 400M
+
+  # ── Client 3: medical (tablet user) ────────────────────────────────────────
+  client-medical:
+    <<: *client-base
+    container_name: fl-client-medical
+    environment:
+      <<: *client-env
+      CLIENT_ID: "client-medical"
+      PROFILE: "medical"
+      SIM_BATTERY_PCT: "75"
+      SIM_CPU_IDLE_PCT: "55"
+      SIM_MEMORY_FREE_MB: "3072"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 400M
+
+  # ── Client 4: sports (phone user) ──────────────────────────────────────────
+  client-sports:
+    <<: *client-base
+    container_name: fl-client-sports
+    environment:
+      <<: *client-env
+      CLIENT_ID: "client-sports"
+      PROFILE: "sports"
+      SIM_BATTERY_PCT: "45"
+      SIM_CPU_IDLE_PCT: "40"
+      SIM_MEMORY_FREE_MB: "1536"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 400M
+
+  # ── Client 5: straggler (deliberately slow — 0.1 CPU) ─────────────────────
+  client-straggler:
+    <<: *client-base
+    container_name: fl-client-straggler
+    environment:
+      <<: *client-env
+      CLIENT_ID: "client-straggler"
+      PROFILE: "mixed"
+      SIM_BATTERY_PCT: "30"
+      SIM_CPU_IDLE_PCT: "20"
+      SIM_MEMORY_FREE_MB: "1024"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 400M
