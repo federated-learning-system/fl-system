@@ -69,3 +69,12 @@ html, body, #root {
 .glow-pulse {
   animation: glow-pulse 2s ease-in-out infinite;
 }
+
+/* suggestion bar loading spinner */
+@keyframes suggestion-spin {
+  to { transform: rotate(360deg); }
+}
+
+.suggestion-spinner {
+  animation: suggestion-spin 0.8s linear infinite;
+}
