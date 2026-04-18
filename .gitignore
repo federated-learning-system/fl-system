@@ -30,8 +30,9 @@ ml/tokenizer/*.vocab
 ml/training/checkpoints/
 ml/training/warmstart_final.pt
 
-# ONNX exports (regenerate with: .venv/bin/python ml/model/export_onnx.py)
+# ONNX exports (regenerate with: make export-model)
 ml/model/*.onnx
+frontend/keyboard-ui/public/models/*.onnx
 
 # Synthetic client datasets (regenerate with: .venv/bin/python ml/synthetic_data/export_datasets.py)
 data/
@@ -41,3 +42,5 @@ data/
 .vscode/
 *.swp
 CLAUDE.md
+t.md
+/docs
