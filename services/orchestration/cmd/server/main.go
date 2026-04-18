@@ -14,6 +14,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	goredis "github.com/redis/go-redis/v9"
+
 	"github.com/x9z0/fls/orchestration/internal/grpcclient"
 	"github.com/x9z0/fls/orchestration/internal/handler"
 	_ "github.com/x9z0/fls/orchestration/internal/metrics" // register metrics
@@ -82,8 +84,16 @@ func main() {
 	defer aggClient.Close()
 	log.Info("gRPC client connected", "addr", aggAddr, "tls", tlsEnabled)
 
+	// ── Redis client ───────────────────────────────────────────────
+	redisHost := envOr("REDIS_HOST", "localhost")
+	redisPort := envOr("REDIS_PORT", "6379")
+	rdb := goredis.NewClient(&goredis.Options{
+		Addr: redisHost + ":" + redisPort,
+	})
+	defer rdb.Close()
+
 	// ── Handler ────────────────────────────────────────────────────
-	h := handler.New(pgStore, aggClient, handler.Config{
+	h := handler.New(pgStore, aggClient, rdb, handler.Config{
 		RegistryURL: registryURL,
 		MinClients:  minClients,
 	}, log)

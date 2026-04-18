@@ -20,6 +20,6 @@ FROM gcr.io/distroless/static:nonroot
 
 COPY --from=builder /bin/aggregation-server /aggregation-server
 
-EXPOSE 50051 9090
+EXPOSE 50051 9100
 
 ENTRYPOINT ["/aggregation-server"]
