@@ -36,8 +36,8 @@ x-client-base: &client-base
     WEBSOCKET_URL: "ws://websocket-push:8080/ws"
     INFERENCE_URL: "http://inference-server:8000"
     MINIO_ENDPOINT: "http://minio:9000"
-    MINIO_ACCESS_KEY: "minioadmin"
-    MINIO_SECRET_KEY: "minioadmin"
+    MINIO_ACCESS_KEY: "flminio"
+    MINIO_SECRET_KEY: "flminio123"
     MINIO_BUCKET_MODELS: "fl-models"
     # ── Paths inside container ──
     DATA_DIR: "/data"

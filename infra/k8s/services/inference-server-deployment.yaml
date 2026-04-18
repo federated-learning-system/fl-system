@@ -26,6 +26,17 @@ spec:
       labels:
         app: inference-server
     spec:
+      initContainers:
+        - name: wait-for-minio
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until wget -qO- http://minio:9000/minio/health/live 2>/dev/null; do
+                echo "Waiting for MinIO..."
+                sleep 3
+              done
       containers:
         - name: inference-server
           image: inference-server:latest
@@ -81,4 +92,4 @@ spec:
       targetPort: metrics
       protocol: TCP
       name: metrics
-  type: ClusterIP
+  type: LoadBalancer

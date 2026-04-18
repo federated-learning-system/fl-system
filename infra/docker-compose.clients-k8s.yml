@@ -1,0 +1,110 @@
+# infra/docker-compose.clients-k8s.yml
+# FL client containers that connect OUTWARD to k8s cluster services.
+#
+# Prerequisites (port-forwards must be running on host):
+#   make port-forwards   → starts all required port-forwards
+#     aggregation-server: 50052  (50051 bound by k3d serverlb)
+#     websocket-push:     8090   (8080  bound by k3d serverlb)
+#     inference-server:   8001   (8000  bound by k3d serverlb)
+#     minio:              9002   (9000  bound by k3d serverlb)
+#     redis:              6379
+#
+# Usage:
+#   make up-clients-k8s    # start FL clients → k8s
+#   make down-clients-k8s  # stop clients
+
+networks:
+  default:
+    driver: bridge
+
+
+x-client-volumes: &client-volumes
+  - ../data:/data:ro
+  - ../infra/certs:/certs:ro
+
+x-client-env: &client-env
+  # Ports 50051/8080/8000 are bound by k3d serverlb but unrouted (no NodePort services).
+  # kubectl port-forward uses offset ports: 50052/8090/8001 instead.
+  AGG_GRPC_ADDR: "host.docker.internal:50052"
+  WEBSOCKET_URL: "ws://host.docker.internal:8090/ws"
+  INFERENCE_URL: "http://host.docker.internal:8001"
+  REGISTRY_URL: "http://host.docker.internal:8091"
+  OFFLOAD_URL: "http://host.docker.internal:8085"
+  MINIO_ENDPOINT: "http://host.docker.internal:9002"
+  MINIO_USE_SSL: "false"
+  MINIO_ACCESS_KEY: "flminio"
+  MINIO_SECRET_KEY: "flminio123"
+  TLS_ENABLED: "true"
+  TLS_CA_CERT: "/certs/ca.crt"
+  TLS_SERVER_NAME: "aggregation-server"
+  DP_EPSILON: "8.0"
+  DP_DELTA: "1e-5"
+  CLIP_NORM: "1.0"
+  FEDPROX_MU: "0.01"
+
+services:
+  client-tech:
+    image: fl-client:${IMAGE_TAG:-latest}
+    container_name: fl-client-tech
+    environment:
+      <<: *client-env
+      CLIENT_PROFILE: "tech"
+      TLS_CLIENT_CERT: "/certs/client-tech.crt"
+      TLS_CLIENT_KEY: "/certs/client-tech.key"
+    volumes: *client-volumes
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  client-casual:
+    image: fl-client:${IMAGE_TAG:-latest}
+    container_name: fl-client-casual
+    environment:
+      <<: *client-env
+      CLIENT_PROFILE: "casual"
+      TLS_CLIENT_CERT: "/certs/client-casual.crt"
+      TLS_CLIENT_KEY: "/certs/client-casual.key"
+    volumes: *client-volumes
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  client-medical:
+    image: fl-client:${IMAGE_TAG:-latest}
+    container_name: fl-client-medical
+    environment:
+      <<: *client-env
+      CLIENT_PROFILE: "medical"
+      TLS_CLIENT_CERT: "/certs/client-medical.crt"
+      TLS_CLIENT_KEY: "/certs/client-medical.key"
+    volumes: *client-volumes
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  client-sports:
+    image: fl-client:${IMAGE_TAG:-latest}
+    container_name: fl-client-sports
+    environment:
+      <<: *client-env
+      CLIENT_PROFILE: "sports"
+      TLS_CLIENT_CERT: "/certs/client-sports.crt"
+      TLS_CLIENT_KEY: "/certs/client-sports.key"
+    volumes: *client-volumes
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  client-straggler:
+    image: fl-client:${IMAGE_TAG:-latest}
+    container_name: fl-client-straggler
+    environment:
+      <<: *client-env
+      CLIENT_PROFILE: "mixed"
+      TLS_CLIENT_CERT: "/certs/client-mixed.crt"
+      TLS_CLIENT_KEY: "/certs/client-mixed.key"
+      # Simulate a slow/constrained device (straggler demonstration)
+      DP_EPSILON: "3.0"
+    volumes: *client-volumes
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

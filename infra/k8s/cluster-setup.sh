@@ -50,6 +50,7 @@ else
     k3d cluster create "${CLUSTER_NAME}" \
         --agents 2 \
         --port "3000:3000@loadbalancer" \
+        --port "8000:8000@loadbalancer" \
         --port "8080:8080@loadbalancer" \
         --port "8081:8081@loadbalancer" \
         --port "8082:8082@loadbalancer" \

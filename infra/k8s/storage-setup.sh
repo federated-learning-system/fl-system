@@ -50,6 +50,8 @@ TARGET="${1:-all}"
 install_redis() {
     echo ""
     echo "==> Installing / upgrading Redis in namespace '${NS}'..."
+    local redis_config
+    redis_config=$'maxmemory 200mb\nmaxmemory-policy allkeys-lru'
     helm upgrade --install redis bitnami/redis \
         --namespace "${NS}" \
         --set auth.enabled=false \
@@ -60,7 +62,7 @@ install_redis() {
         --set master.persistence.enabled=true \
         --set master.persistence.size=1Gi \
         --set replica.replicaCount=0 \
-        --set master.configuration="maxmemory 200mb\nmaxmemory-policy allkeys-lru" \
+        --set-string master.configuration="${redis_config}" \
         --wait --timeout=120s
     echo "    Redis OK"
 }

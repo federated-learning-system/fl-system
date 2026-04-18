@@ -72,12 +72,13 @@ metadata:
   namespace: fl-monitoring
 spec:
   hard:
-    # Monitoring stack is deliberately kept lean on this laptop.
-    requests.memory: "512Mi"
-    limits.memory: "1Gi"
+    # kube-prometheus-stack: operator(256Mi) + kube-state-metrics(256Mi)
+    #   + prometheus(512Mi) + grafana+sidecar(512Mi) ≈ 1.5Gi limits
+    requests.memory: "768Mi"
+    limits.memory: "2Gi"
     requests.cpu: "500m"
-    limits.cpu: "1"
-    pods: "10"
+    limits.cpu: "2"
+    pods: "20"
     services: "10"
     persistentvolumeclaims: "5"
 
@@ -97,5 +98,5 @@ spec:
         memory: "256Mi"
         cpu: "200m"
       max:
-        memory: "1Gi"
-        cpu: "1"
+        memory: "2Gi"
+        cpu: "2"

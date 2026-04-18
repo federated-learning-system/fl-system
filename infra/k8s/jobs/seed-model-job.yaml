@@ -6,8 +6,9 @@
 #
 # Prerequisites:
 #   - MinIO and Redis running in fl-system namespace
-#   - fl-base-python image built (make build-python-base)
-#   - ONNX model files available in the image or mounted volume
+#   - fl-seed-job image built and imported:
+#       make build-seed-job
+#       k3d image import fl-seed-job:latest -c fl-demo
 #
 # Usage:
 #   kubectl delete job seed-model --namespace fl-system --ignore-not-found
@@ -55,7 +56,8 @@ spec:
 
       containers:
         - name: seed
-          image: fl-base-python:latest
+          image: fl-seed-job:latest
+          imagePullPolicy: IfNotPresent
           env:
             - name: REDIS_HOST
               value: "redis-master"
@@ -71,15 +73,5 @@ spec:
               value: "v1.0.0"
           command:
             - python
-            - /app/ml/training/seed_model_store.py
-          volumeMounts:
-            - name: app-code
-              mountPath: /app
-              readOnly: true
-
-      volumes:
-        # In production: mount from a PVC or bake into the image.
-        # For local k3d dev, copy repo into a hostPath or use:
-        #   kubectl cp . fl-system/seed-model-pod:/app
-        - name: app-code
-          emptyDir: {}
+            - ml/training/seed_model_store.py
+          # No volumeMounts needed — all files baked into the image

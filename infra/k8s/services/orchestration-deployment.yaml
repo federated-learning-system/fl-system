@@ -25,6 +25,17 @@ spec:
       labels:
         app: orchestration
     spec:
+      initContainers:
+        - name: wait-for-redis
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z redis-master 6379; do
+                echo "Waiting for Redis..."
+                sleep 2
+              done
       containers:
         - name: orchestration
           image: orchestration:latest
@@ -50,6 +61,10 @@ spec:
               value: "/certs/tls.key"
             - name: TLS_CA
               value: "/certs/ca.crt"
+            - name: REDIS_HOST
+              value: "redis-master"
+            - name: REDIS_PORT
+              value: "6379"
           volumeMounts:
             - name: tls-certs
               mountPath: /certs
