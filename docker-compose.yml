@@ -28,8 +28,8 @@ x-common-env: &common-env
   MINIO_ENDPOINT: "http://minio:9000"
   MINIO_ENDPOINT_RAW: "minio:9000"
   MINIO_USE_SSL: "false"
-  MINIO_ACCESS_KEY: "minioadmin"
-  MINIO_SECRET_KEY: "minioadmin"
+  MINIO_ACCESS_KEY: "flminio"
+  MINIO_SECRET_KEY: "flminio123"
   MINIO_BUCKET_MODELS: "fl-models"
   DB_HOST: "postgres"
   DB_PORT: "5432"
@@ -60,8 +60,8 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: flminio
+      MINIO_ROOT_PASSWORD: flminio123
     networks: [fl-net]
     volumes:
       - minio-data:/data
@@ -97,9 +97,15 @@ services:
     networks: [fl-net]
     environment:
       <<: *common-env
+      TLS_CERT: "/certs/server.crt"
+      TLS_KEY: "/certs/server.key"
+      TLS_CA: "/certs/ca.crt"
+      METRICS_PORT: "9100"
     ports:
       - "50051:50051"
-      - "9090:9090"
+      - "9100:9100"
+    volumes:
+      - ./infra/certs:/certs:ro
     depends_on:
       redis:    {condition: service_healthy}
       minio:    {condition: service_healthy}
@@ -124,6 +130,13 @@ services:
       <<: *common-env
       MIN_CLIENTS_PER_ROUND: "2"
       ROUND_INTERVAL_MINUTES: "60"
+      TLS_CERT: "/certs/client-tech.crt"
+      TLS_KEY: "/certs/client-tech.key"
+      TLS_CA: "/certs/ca.crt"
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./infra/certs:/certs:ro
     depends_on:
       redis: {condition: service_healthy}
     profiles: ["services"]
@@ -173,6 +186,20 @@ services:
       - "8000:8000"
     depends_on:
       minio: {condition: service_healthy}
+    profiles: ["services"]
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Web frontend (profile: services)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  web-frontend:
+    image: web-frontend:${IMAGE_TAG:-latest}
+    networks: [fl-net]
+    ports:
+      - "3000:3000"
+    depends_on:
+      orchestration: {condition: service_started}
+      inference-server: {condition: service_started}
     profiles: ["services"]
 
   # ═══════════════════════════════════════════════════════════════════════════
