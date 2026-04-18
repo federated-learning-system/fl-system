@@ -81,6 +81,7 @@ def upload_to_minio() -> dict[str, str]:
     files = [
         (ONNX_FP32, f"models/{MODEL_VERSION}/model.onnx"),
         (ONNX_INT8, f"models/{MODEL_VERSION}/model_quant.onnx"),
+        (WARMSTART_CKPT, f"models/{MODEL_VERSION}/model_weights.pt"),
         (VOCAB_MODEL, "vocab/vocab_8192.model"),
         (VOCAB_JSON, "vocab/vocab_8192.vocab"),
     ]
