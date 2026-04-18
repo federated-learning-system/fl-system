@@ -184,8 +184,11 @@ class FLClientAgent:
                 private_key=key,
                 certificate_chain=cert,
             )
-            self._grpc_channel = grpc.secure_channel(self.cfg.agg_grpc_addr, creds)
-            log.info("gRPC mTLS channel to %s", self.cfg.agg_grpc_addr)
+            options = []
+            if self.cfg.tls_server_name:
+                options.append(("grpc.ssl_target_name_override", self.cfg.tls_server_name))
+            self._grpc_channel = grpc.secure_channel(self.cfg.agg_grpc_addr, creds, options=options)
+            log.info("gRPC mTLS channel to %s (sni=%s)", self.cfg.agg_grpc_addr, self.cfg.tls_server_name or "default")
         else:
             self._grpc_channel = grpc.insecure_channel(self.cfg.agg_grpc_addr)
             log.info("gRPC insecure channel to %s", self.cfg.agg_grpc_addr)
@@ -336,11 +339,11 @@ class FLClientAgent:
             resp = self._grpc_stub.GetGlobalModel(req, timeout=30)
 
             if resp.model_url:
-                # Download the .pt weights via presigned URL
-                # The model_url points to ONNX; we need the .pt for training
-                # Construct the weights URL from the version
-                weights_url = resp.model_url.replace("model_quant.onnx", "model_weights.pt")
-                weights_url = weights_url.replace("model.onnx", "model_weights.pt")
+                # Download the .pt weights via dedicated presigned URL (field 4).
+                # model_url is for ONNX; weights_url is for model_weights.pt.
+                weights_url = resp.weights_url or resp.model_url.replace(
+                    "model_quant.onnx", "model_weights.pt"
+                ).replace("model.onnx", "model_weights.pt")
 
                 r = requests.get(weights_url, timeout=60)
                 if r.status_code == 200:
@@ -485,7 +488,7 @@ class FLClientAgent:
 
     def _handle_offload(self, round_id: str, model_version: str) -> None:
         """Offload training to the offload-worker service."""
-        offload_url = self.cfg.registry_url.replace(":8081", ":8085")
+        offload_url = self.cfg.offload_url
         url = f"{offload_url}/offload/jobs"
 
         payload = {

@@ -31,6 +31,9 @@ class ClientConfig:
     registry_url: str = field(
         default_factory=lambda: _env("REGISTRY_URL", "http://localhost:8081")
     )
+    offload_url: str = field(
+        default_factory=lambda: _env("OFFLOAD_URL", "http://localhost:8085")
+    )
     websocket_url: str = field(
         default_factory=lambda: _env("WEBSOCKET_URL", "ws://localhost:8080/ws")
     )
@@ -58,6 +61,9 @@ class ClientConfig:
     )
     tls_ca_cert: str = field(
         default_factory=lambda: _env("TLS_CA_CERT", "/certs/ca.crt")
+    )
+    tls_server_name: str = field(
+        default_factory=lambda: _env("TLS_SERVER_NAME", "")
     )
     tls_client_cert: str = field(
         default_factory=lambda: _env("TLS_CLIENT_CERT", "/certs/client.crt")

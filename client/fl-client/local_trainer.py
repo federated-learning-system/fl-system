@@ -34,27 +34,33 @@ log = logging.getLogger(__name__)
 class LocalTrainer:
     """Trains a NextWordLSTM on local data and returns the weight delta."""
 
-    def __init__(self, model_path: str) -> None:
-        """
-        Load the global model checkpoint.
+    # Default model architecture — matches the seeded LSTM in ml/model/
+    _DEFAULT_MODEL_CONFIG = {
+        "vocab_size": 8192, "embed_dim": 128, "hidden_size": 256,
+        "num_layers": 2, "dropout": 0.2, "seq_len": 10, "padding_idx": 0,
+    }
 
-        Args:
-            model_path: Path to the .pt checkpoint file containing
-                        'model_state_dict' and 'model_config'.
-        """
+    def __init__(self, model_path: str) -> None:
         self._model_path = model_path
-        self._checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
-        self._model_config = self._checkpoint["model_config"]
+        ckpt = torch.load(model_path, map_location="cpu", weights_only=False)
+        # Support both full checkpoint format and raw state_dict (FedAvg output)
+        if isinstance(ckpt, dict) and "model_state_dict" in ckpt:
+            self._checkpoint = ckpt
+            self._model_config = ckpt.get("model_config", self._DEFAULT_MODEL_CONFIG)
+            self._state_dict = ckpt["model_state_dict"]
+        else:
+            self._checkpoint = ckpt
+            self._model_config = self._DEFAULT_MODEL_CONFIG
+            self._state_dict = ckpt
 
     def _build_model(self) -> nn.Module:
         """Reconstruct the LSTM model from checkpoint config."""
-        # Import here to avoid circular dependency at module level
         from ml.model.lstm_model import NextWordLSTM
         from ml.model.model_config import ModelConfig
 
         config = ModelConfig.from_dict(self._model_config)
         model = NextWordLSTM.from_config(config)
-        model.load_state_dict(self._checkpoint["model_state_dict"])
+        model.load_state_dict(self._state_dict)
         return model
 
     def _prepare_data(
