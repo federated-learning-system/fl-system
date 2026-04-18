@@ -26,6 +26,27 @@ spec:
       labels:
         app: offload-worker
     spec:
+      initContainers:
+        - name: wait-for-redis
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z redis-master 6379; do
+                echo "Waiting for Redis..."
+                sleep 2
+              done
+        - name: wait-for-minio
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until wget -qO- http://minio:9000/minio/health/live 2>/dev/null; do
+                echo "Waiting for MinIO..."
+                sleep 3
+              done
       containers:
         - name: offload-worker
           image: offload-worker:latest
@@ -33,6 +54,8 @@ spec:
           ports:
             - containerPort: 8085
               name: http
+            - containerPort: 9100
+              name: metrics
           envFrom:
             - configMapRef:
                 name: fl-common-config
@@ -75,4 +98,8 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    - port: 9100
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
   type: ClusterIP

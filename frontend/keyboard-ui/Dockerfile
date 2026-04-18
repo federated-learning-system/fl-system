@@ -6,6 +6,8 @@ COPY frontend/keyboard-ui/package.json frontend/keyboard-ui/package-lock.json ./
 RUN npm ci --ignore-scripts
 
 COPY frontend/keyboard-ui/ ./
+# Copy WASM runtime files (onnxruntime-web WASM backend for in-browser inference)
+RUN cp node_modules/onnxruntime-web/dist/*.wasm public/
 RUN npm run build
 
 # ── Serve stage ───────────────────────────────────────────────────────────────

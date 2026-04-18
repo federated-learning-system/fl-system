@@ -1,0 +1,161 @@
+---
+# infra/k8s/services/service-monitors.yaml
+#
+# ServiceMonitor CRDs for Prometheus Operator auto-discovery of all FL services.
+# All services expose /metrics on port 9100 (named "metrics" in their Service specs).
+#
+# Prerequisites:
+#   - kube-prometheus-stack (or Prometheus Operator) installed in fl-monitoring namespace
+#   - Prometheus configured to watch ServiceMonitors in fl-system namespace
+#     (via serviceMonitorNamespaceSelector or serviceMonitorSelector)
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: aggregation-server
+  namespace: fl-system
+  labels:
+    app: aggregation-server
+    app.kubernetes.io/part-of: fls
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: aggregation-server
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: client-registry
+  namespace: fl-system
+  labels:
+    app: client-registry
+    app.kubernetes.io/part-of: fls
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: client-registry
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: orchestration
+  namespace: fl-system
+  labels:
+    app: orchestration
+    app.kubernetes.io/part-of: fls
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: orchestration
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: straggler-watch
+  namespace: fl-system
+  labels:
+    app: straggler-watch
+    app.kubernetes.io/part-of: fls
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: straggler-watch
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: websocket-push
+  namespace: fl-system
+  labels:
+    app: websocket-push
+    app.kubernetes.io/part-of: fls
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: websocket-push
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: fedavg-engine
+  namespace: fl-system
+  labels:
+    app: fedavg-engine
+    app.kubernetes.io/part-of: fls
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: fedavg-engine
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: inference-server
+  namespace: fl-system
+  labels:
+    app: inference-server
+    app.kubernetes.io/part-of: fls
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: inference-server
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: offload-worker
+  namespace: fl-system
+  labels:
+    app: offload-worker
+    app.kubernetes.io/part-of: fls
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: offload-worker
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s

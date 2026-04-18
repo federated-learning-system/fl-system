@@ -13,9 +13,11 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	miniogo "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/x9z0/fls/offload-api/internal/handler"
+	_ "github.com/x9z0/fls/offload-api/internal/metrics" // register metrics
 )
 
 func main() {
@@ -24,6 +26,7 @@ func main() {
 
 	// ── Config ──────────────────────────────────────────────────────
 	port := envOr("PORT", "8085")
+	metricsPort := envOr("METRICS_PORT", "9100")
 	redisAddr := envOr("REDIS_ADDR", "localhost:6379")
 	minioEndpoint := envOr("MINIO_ENDPOINT_RAW", envOr("MINIO_ENDPOINT", "localhost:9000"))
 	minioAccessKey := envOr("MINIO_ACCESS_KEY", "flminio")
@@ -73,6 +76,20 @@ func main() {
 	}
 	bucketCancel()
 	log.Info("connected to MinIO", "endpoint", minioEndpoint)
+
+	// ── Prometheus metrics endpoint ─────────────────────────────────
+	go func() {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", promhttp.Handler())
+		metricsMux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("ok"))
+		})
+		log.Info("metrics server listening", "port", metricsPort)
+		if err := http.ListenAndServe(":"+metricsPort, metricsMux); err != nil {
+			log.Error("metrics server error", "error", err)
+		}
+	}()
 
 	// ── Handler ─────────────────────────────────────────────────────
 	h := handler.New(rdb, mc, log)

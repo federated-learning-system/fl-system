@@ -24,8 +24,8 @@ Environment variables (with defaults for docker-compose):
     REDIS_HOST          localhost
     REDIS_PORT          6379
     MINIO_ENDPOINT      http://localhost:9000
-    MINIO_ACCESS_KEY    minioadmin
-    MINIO_SECRET_KEY    minioadmin
+    MINIO_ACCESS_KEY    flminio
+    MINIO_SECRET_KEY    flminio123
 
 Usage:
     # From project root, after `make up-all`:
@@ -57,8 +57,8 @@ REGISTRY_URL = os.environ.get("REGISTRY_URL", "http://localhost:8081")
 REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.environ.get("REDIS_PORT", "6379"))
 MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT", "http://localhost:9000")
-MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
-MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY", "minioadmin")
+MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY", "flminio")
+MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY", "flminio123")
 
 # Timeouts
 ROUND_TIMEOUT_S = 300  # 5 minutes max for round to complete

@@ -39,6 +39,10 @@ var (
 		Help:    "Duration of FL rounds",
 		Buckets: prometheus.ExponentialBuckets(10, 2, 8), // 10s to ~2560s
 	})
+	clientEpsilonConsumed = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "fl_client_epsilon_consumed",
+		Help: "Cumulative differential privacy epsilon consumed per client",
+	}, []string{"client_id"})
 )
 
 // AggregationServer implements the gRPC AggregationServiceServer interface.
@@ -228,12 +232,18 @@ func (s *AggregationServer) GetGlobalModel(ctx context.Context, req *pb.GetModel
 		s.log.Warn("presign vocab failed", "error", err)
 	}
 
+	weightsURL, err := s.minio.WeightsPresignedURL(ctx, version)
+	if err != nil {
+		s.log.Warn("presign weights failed", "error", err)
+	}
+
 	metaJSON, _ := json.Marshal(meta)
 
 	return &pb.GetModelResp{
-		ModelUrl:  modelURL,
-		ModelMeta: metaJSON,
-		VocabUrl:  vocabURL,
+		ModelUrl:   modelURL,
+		ModelMeta:  metaJSON,
+		VocabUrl:   vocabURL,
+		WeightsUrl: weightsURL,
 	}, nil
 }
 
@@ -316,8 +326,13 @@ func (s *AggregationServer) EmitMetrics(ctx context.Context, req *pb.MetricsReq)
 		"epsilon_spent", req.DpEpsilonSpent,
 	)
 
-	// Log metrics — in production, push to Prometheus pushgateway
-	// For now, metrics are exposed via /metrics endpoint on the server
+	if req.ClientId != "" {
+		if req.DpEpsilonCumulative > 0 {
+			clientEpsilonConsumed.WithLabelValues(req.ClientId).Set(req.DpEpsilonCumulative)
+		} else if req.DpEpsilonSpent > 0 {
+			clientEpsilonConsumed.WithLabelValues(req.ClientId).Add(req.DpEpsilonSpent)
+		}
+	}
 
 	return &pb.MetricsResp{Ok: true}, nil
 }

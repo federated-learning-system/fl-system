@@ -1,9 +1,17 @@
+# Git
+.git/
+
 # Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .venv/
+.mypy_cache/
+.pytest_cache/
+
+# Node
+node_modules/
 
 # Env / secrets
 .env
@@ -22,3 +30,5 @@ infra/certs/
 
 # Temp / generated outside build context
 temp/
+tests/
+monitoring/

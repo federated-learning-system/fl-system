@@ -20,6 +20,6 @@ FROM gcr.io/distroless/static:nonroot
 
 COPY --from=builder /bin/straggler-watch /straggler-watch
 
-EXPOSE 9092
+EXPOSE 9100
 
 ENTRYPOINT ["/straggler-watch"]

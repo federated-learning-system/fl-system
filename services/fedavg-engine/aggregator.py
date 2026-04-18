@@ -71,6 +71,11 @@ rounds_failed = Counter(
     "Total number of rounds that failed aggregation",
 )
 
+model_version_current = Gauge(
+    "fl_model_version_current",
+    "Numeric representation of the current global model version (patch number)",
+)
+
 
 # ── Core FedAvg-R ────────────────────────────────────────────────────────────
 
@@ -302,9 +307,13 @@ class FedAvgWorker:
             straggler_key = f"round:{round_id}:stragglers"
             stragglers = self.redis.smembers(straggler_key)
 
-            # Load base model version
+            # Load base model version — prefer round config, fall back to model:current
             config_data = self.redis.hgetall(keys.round_config(round_id))
-            model_version = config_data.get("base_model_version", "v1.0.0")
+            model_version = (
+                config_data.get("base_model_version")
+                or self.redis.get(keys.model_current())
+                or "v1.0.0"
+            )
 
             # Load base model from MinIO
             base_model = self._load_base_model(model_version)
@@ -327,7 +336,7 @@ class FedAvgWorker:
                     delta = deserialize_delta(blob)
                     updates.append({
                         "delta": delta,
-                        "num_samples": int(config_data.get("num_samples", 100)),
+                        "num_samples": int(config_data.get("num_samples") or 100),
                         "is_straggler": client_id in stragglers,
                         "checksum": "ok",  # already verified at submit time
                     })
@@ -385,6 +394,13 @@ class FedAvgWorker:
             aggregation_duration.observe(elapsed)
             rounds_aggregated.inc()
 
+            # Update model version gauge (extract numeric patch from vX.Y.Z)
+            try:
+                patch = int(new_version.lstrip("v").split(".")[-1])
+                model_version_current.set(patch)
+            except (ValueError, IndexError):
+                pass
+
             log.info(
                 "Round %s aggregated: %d clients → %s (%.1fs)",
                 round_id, len(updates), new_version, elapsed,
@@ -410,8 +426,15 @@ class FedAvgWorker:
             with tempfile.NamedTemporaryFile(suffix=".pt") as tmp:
                 download_blob(BUCKET_MODELS, weights_key, tmp.name)
                 checkpoint = torch.load(tmp.name, map_location="cpu", weights_only=True)
-                if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
-                    return checkpoint["state_dict"]
+                if isinstance(checkpoint, dict):
+                    # Try common checkpoint key names for the model state dict
+                    for key in ("state_dict", "model_state_dict"):
+                        if key in checkpoint:
+                            return checkpoint[key]
+                    # If no recognised wrapper key, filter to only tensor values
+                    tensor_only = {k: v for k, v in checkpoint.items() if isinstance(v, torch.Tensor)}
+                    if tensor_only:
+                        return tensor_only
                 return checkpoint
         except Exception as e:
             log.error("Failed to load model weights: %s", e)
@@ -450,7 +473,7 @@ def main() -> None:
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
 
-    metrics_port = int(os.environ.get("METRICS_PORT", "9093"))
+    metrics_port = int(os.environ.get("METRICS_PORT", "9100"))
     start_http_server(metrics_port)
     log.info("Prometheus metrics on :%d", metrics_port)
 

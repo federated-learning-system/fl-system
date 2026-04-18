@@ -28,12 +28,15 @@ func main() {
 
 	// ── Config ──────────────────────────────────────────────────────
 	grpcPort := envOr("GRPC_PORT", "50051")
-	metricsPort := envOr("METRICS_PORT", "9090")
+	metricsPort := envOr("METRICS_PORT", "9100")
 	redisAddr := envOr("REDIS_ADDR", "localhost:6379")
 	minioEndpoint := envOr("MINIO_ENDPOINT", "localhost:9000")
 	minioAccessKey := envOr("MINIO_ACCESS_KEY", "flminio")
 	minioSecretKey := envOr("MINIO_SECRET_KEY", "flminio123")
 	minioSSL := envOr("MINIO_USE_SSL", "false") == "true"
+	// MINIO_PRESIGN_ENDPOINT: when set, presigned URLs use this endpoint instead of the
+	// internal one. Required for Docker/external clients that can't resolve minio:9000.
+	minioPresignEndpoint := os.Getenv("MINIO_PRESIGN_ENDPOINT")
 
 	tlsCert := envOr("TLS_CERT", "infra/certs/server.crt")
 	tlsKey := envOr("TLS_KEY", "infra/certs/server.key")
@@ -53,7 +56,7 @@ func main() {
 	log.Info("connected to Redis", "addr", redisAddr)
 
 	// ── MinIO ───────────────────────────────────────────────────────
-	mc, err := minioclient.New(minioEndpoint, minioAccessKey, minioSecretKey, minioSSL, log)
+	mc, err := minioclient.New(minioEndpoint, minioAccessKey, minioSecretKey, minioSSL, log, minioPresignEndpoint)
 	if err != nil {
 		log.Error("minio connection failed", "error", err)
 		os.Exit(1)

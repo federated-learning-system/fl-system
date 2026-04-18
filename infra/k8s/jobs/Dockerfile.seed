@@ -1,0 +1,24 @@
+# infra/k8s/jobs/Dockerfile.seed
+# Seed job image — bakes model + scripts into a self-contained image.
+# No volume mounts needed at runtime.
+#
+# Build: make build-seed-job
+# Run:   kubectl apply -f infra/k8s/jobs/seed-model-job.yaml
+FROM fl-base-python:latest
+WORKDIR /app
+
+# Copy shared Python library (minio_client, redis_client)
+COPY services/shared/ ./services/shared/
+
+# Copy seed script and its dependencies
+COPY ml/training/seed_model_store.py ./ml/training/seed_model_store.py
+
+# Copy model files (float32 + INT8 quantized ONNX)
+COPY ml/model/model.onnx ./ml/model/model.onnx
+COPY ml/model/model_quant.onnx ./ml/model/model_quant.onnx
+
+# Copy tokenizer vocab files
+COPY ml/tokenizer/vocab_8192.model ./ml/tokenizer/vocab_8192.model
+COPY ml/tokenizer/vocab_8192.vocab ./ml/tokenizer/vocab_8192.vocab
+
+CMD ["python", "ml/training/seed_model_store.py"]

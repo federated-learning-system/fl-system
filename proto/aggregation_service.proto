@@ -73,9 +73,10 @@ message GetModelReq {
 }
 
 message GetModelResp {
-  string model_url    = 1; // presigned MinIO GET URL
+  string model_url    = 1; // presigned MinIO GET URL (model_quant.onnx)
   bytes  model_meta   = 2; // JSON-encoded model metadata blob (version, checksum, …)
   string vocab_url    = 3; // presigned URL for vocab_8192.model
+  string weights_url  = 4; // presigned URL for model_weights.pt (PyTorch checkpoint for training)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

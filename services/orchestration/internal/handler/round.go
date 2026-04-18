@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/x9z0/fls/orchestration/internal/grpcclient"
 	"github.com/x9z0/fls/orchestration/internal/store"
@@ -19,6 +20,7 @@ import (
 type Handler struct {
 	store       *store.Store
 	aggClient   *grpcclient.AggregationClient
+	redis       *redis.Client
 	registryURL string
 	log         *slog.Logger
 	minClients  int32
@@ -31,10 +33,11 @@ type Config struct {
 }
 
 // New creates a Handler.
-func New(s *store.Store, agg *grpcclient.AggregationClient, cfg Config, log *slog.Logger) *Handler {
+func New(s *store.Store, agg *grpcclient.AggregationClient, rdb *redis.Client, cfg Config, log *slog.Logger) *Handler {
 	return &Handler{
 		store:       s,
 		aggClient:   agg,
+		redis:       rdb,
 		registryURL: cfg.RegistryURL,
 		log:         log,
 		minClients:  cfg.MinClients,
@@ -77,6 +80,16 @@ func (h *Handler) CloseRound(w http.ResponseWriter, r *http.Request) {
 		h.log.Error("close round failed", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
+	}
+
+	// Publish ROUND_CLOSED so FedAvg worker triggers aggregation
+	evt, _ := json.Marshal(map[string]string{"event": "ROUND_CLOSED", "round_id": roundID})
+	if h.redis != nil {
+		if err := h.redis.Publish(ctx, "fl:round:events", string(evt)).Err(); err != nil {
+			h.log.Warn("publish ROUND_CLOSED failed", "error", err)
+		} else {
+			h.log.Info("published ROUND_CLOSED", "round_id", roundID)
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{

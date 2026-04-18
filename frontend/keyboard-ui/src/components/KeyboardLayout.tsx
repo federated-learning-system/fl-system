@@ -1,5 +1,6 @@
 import { useCallback, useState, type MouseEvent } from "react";
 import type { RoundState } from "../hooks/useKeyboardState";
+import type { InferenceSource } from "../inference/inference_pipeline";
 
 // ── Key layouts ──────────────────────────────────────────────────────────────
 
@@ -17,6 +18,8 @@ const ROWS_NUMBERS = [
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+type RoundButtonState = "idle" | "starting" | "open" | "aggregating" | "done";
+
 interface KeyboardLayoutProps {
   shiftActive: boolean;
   numbersActive: boolean;
@@ -25,6 +28,7 @@ interface KeyboardLayoutProps {
   dpEpsilon: number;
   dpBudget: number;
   modelVersion: string;
+  modelSource: InferenceSource;
   roundState: RoundState;
   onTypeChar: (char: string) => void;
   onBackspace: () => void;
@@ -33,6 +37,7 @@ interface KeyboardLayoutProps {
   onToggleShift: () => void;
   onToggleNumbers: () => void;
   onSelectSuggestion: (index: number) => void;
+  onStartRound?: () => void;
 }
 
 // ── Round state styling ──────────────────────────────────────────────────────
@@ -53,6 +58,34 @@ const ROUND_DOT_BG: Record<RoundState, string> = {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
+// ── Model source label ──────────────────────────────────────────────────────
+
+const SOURCE_LABELS: Record<InferenceSource, string> = {
+  loading: "loading\u2026",
+  onnx: "onnx",
+  server: "server",
+  ngram: "ngram",
+};
+
+// ── Round button labels ──────────────────────────────────────────────────────
+
+const ROUND_BTN_LABELS: Record<RoundButtonState, string> = {
+  idle: "Start Round",
+  starting: "Starting\u2026",
+  open: "Round OPEN",
+  aggregating: "Aggregating\u2026",
+  done: "Done \u2713",
+};
+
+function mapRoundState(rs: RoundState): RoundButtonState {
+  switch (rs) {
+    case "OPEN": return "open";
+    case "COLLECTING": return "aggregating";
+    case "DONE": return "done";
+    default: return "idle";
+  }
+}
+
 export function KeyboardLayout({
   shiftActive,
   numbersActive,
@@ -61,6 +94,7 @@ export function KeyboardLayout({
   dpEpsilon,
   dpBudget,
   modelVersion,
+  modelSource,
   roundState,
   onTypeChar,
   onBackspace,
@@ -69,9 +103,11 @@ export function KeyboardLayout({
   onToggleShift,
   onToggleNumbers,
   onSelectSuggestion,
+  onStartRound,
 }: KeyboardLayoutProps) {
   const rows = numbersActive ? ROWS_NUMBERS : ROWS_ALPHA;
   const [pressedKey, setPressedKey] = useState<string | null>(null);
+  const [roundBtnBusy, setRoundBtnBusy] = useState(false);
 
   const handleKey = useCallback(
     (key: string, handler: () => void) => (e: MouseEvent) => {
@@ -95,22 +131,29 @@ export function KeyboardLayout({
         data-testid="suggestion-bar"
         className="flex gap-2 px-1 py-1.5"
       >
-        {suggestions.map((word, i) => (
-          <button
-            key={i}
-            data-testid={`suggestion-${i}`}
-            onClick={() => onSelectSuggestion(i)}
-            className={`flex-1 h-9 rounded-lg border text-sm font-[family-name:var(--font-display)] transition-all duration-150
-              ${
-                word
-                  ? "bg-pill-bg border-pill-border text-text-primary hover:border-accent hover:text-accent hover:shadow-[0_0_12px_rgba(58,255,180,0.12)]"
-                  : "bg-surface border-border-dim text-text-dim cursor-default"
-              }
-            `}
-          >
-            {word || "\u00B7\u00B7\u00B7"}
-          </button>
-        ))}
+        {modelSource === "loading" && !suggestions.some(Boolean) ? (
+          <div className="flex-1 flex items-center justify-center h-9 rounded-lg border border-border-dim bg-surface text-text-dim text-xs gap-2">
+            <span className="inline-block w-3 h-3 border-2 border-accent/40 border-t-accent rounded-full suggestion-spinner" />
+            Loading model...
+          </div>
+        ) : (
+          suggestions.map((word, i) => (
+            <button
+              key={i}
+              data-testid={`suggestion-${i}`}
+              onClick={() => onSelectSuggestion(i)}
+              className={`flex-1 h-9 rounded-lg border text-sm font-[family-name:var(--font-display)] transition-all duration-150
+                ${
+                  word
+                    ? "bg-pill-bg border-pill-border text-text-primary hover:border-accent hover:text-accent hover:shadow-[0_0_12px_rgba(58,255,180,0.12)]"
+                    : "bg-surface border-border-dim text-text-dim cursor-default"
+                }
+              `}
+            >
+              {word || "\u00B7\u00B7\u00B7"}
+            </button>
+          ))
+        )}
       </div>
 
       {/* ── Key rows ── */}
@@ -206,20 +249,23 @@ export function KeyboardLayout({
         className="flex items-center justify-between px-3 py-2 mt-1 rounded-lg bg-surface-raised border border-border-dim text-[10px] tracking-wide"
       >
         <span className="text-text-dim">
-          Training buffer:{" "}
-          <span className="text-text-secondary">{trainingBuffer} samples</span>
+          <span className="text-text-secondary">{trainingBuffer}</span> samples
         </span>
 
         <span className="text-text-dim">
-          DP {"\u03B5"}:{" "}
+          {"\u03B5"}{" "}
           <span className="text-text-secondary">
             {dpEpsilon.toFixed(2)}/{dpBudget.toFixed(2)}
           </span>
         </span>
 
         <span className="text-text-dim">
-          Model:{" "}
-          <span className="text-accent-dim">{modelVersion}</span>
+          <span className={`${modelSource === "loading" ? "text-round-collecting" : "text-accent-dim"}`}>
+            {modelVersion}
+          </span>
+          <span className="text-text-dim ml-1">
+            ({SOURCE_LABELS[modelSource]})
+          </span>
         </span>
 
         <span className={`flex items-center gap-1 ${ROUND_COLORS[roundState]}`}>
@@ -229,6 +275,34 @@ export function KeyboardLayout({
           {roundState}
         </span>
       </div>
+
+      {/* ── Start Round button ── */}
+      {onStartRound && (
+        <button
+          data-testid="start-round-btn"
+          onClick={() => {
+            if (roundBtnBusy || roundState === "OPEN" || roundState === "COLLECTING") return;
+            setRoundBtnBusy(true);
+            onStartRound();
+            // Reset busy after brief delay (actual state comes via WebSocket/polling)
+            setTimeout(() => setRoundBtnBusy(false), 2000);
+          }}
+          disabled={roundBtnBusy || roundState === "OPEN" || roundState === "COLLECTING"}
+          className={`mt-1 w-full py-1.5 rounded-lg border text-[10px] tracking-wider font-[family-name:var(--font-display)] transition-all duration-200
+            ${
+              roundState === "OPEN" || roundState === "COLLECTING"
+                ? "bg-surface border-round-collecting/30 text-round-collecting cursor-not-allowed"
+                : roundState === "DONE"
+                  ? "bg-round-done/10 border-round-done/30 text-round-done hover:bg-round-done/20 cursor-pointer"
+                  : roundBtnBusy
+                    ? "bg-surface border-accent/30 text-accent/60 cursor-wait"
+                    : "bg-accent/8 border-accent/20 text-accent hover:bg-accent/15 hover:border-accent/40 cursor-pointer"
+            }
+          `}
+        >
+          {roundBtnBusy ? ROUND_BTN_LABELS.starting : ROUND_BTN_LABELS[mapRoundState(roundState)]}
+        </button>
+      )}
     </div>
   );
 }

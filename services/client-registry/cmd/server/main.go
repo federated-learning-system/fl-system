@@ -12,9 +12,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/x9z0/fls/client-registry/internal/auth"
 	"github.com/x9z0/fls/client-registry/internal/handler"
+	_ "github.com/x9z0/fls/client-registry/internal/metrics" // register metrics
 	"github.com/x9z0/fls/client-registry/internal/store"
 )
 
@@ -24,6 +26,7 @@ func main() {
 
 	// ── Config from env ─────────────────────────────────────────────
 	port := envOr("PORT", "8081")
+	metricsPort := envOr("METRICS_PORT", "9100")
 	dbHost := envOr("DB_HOST", "localhost")
 	dbPort := envOr("DB_PORT", "5432")
 	dbUser := envOr("DB_USER", "postgres")
@@ -70,6 +73,20 @@ func main() {
 		r.Post("/clients/{id}/budget", h.UpdateBudget)
 		r.Post("/auth/refresh", h.RefreshToken)
 	})
+
+	// ── Prometheus metrics endpoint ─────────────────────────────────
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("ok"))
+		})
+		log.Info("metrics server listening", "port", metricsPort)
+		if err := http.ListenAndServe(":"+metricsPort, mux); err != nil {
+			log.Error("metrics server error", "error", err)
+		}
+	}()
 
 	// ── Server ──────────────────────────────────────────────────────
 	srv := &http.Server{

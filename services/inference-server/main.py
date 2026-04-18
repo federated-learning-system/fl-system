@@ -28,7 +28,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from prometheus_client import Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, start_http_server
 from starlette.responses import Response
 
 # ── Path setup ───────────────────────────────────────────────────────────────
@@ -51,6 +51,11 @@ inference_latency = Histogram(
     "fl_inference_latency_ms",
     "Inference latency in milliseconds",
     buckets=[5, 10, 20, 50, 100, 200, 500, 1000],
+)
+
+model_version_active = Gauge(
+    "fl_model_version_active",
+    "Numeric representation of the currently loaded model version (patch number)",
 )
 
 # ── Pydantic models ──────────────────────────────────────────────────────────
@@ -79,11 +84,26 @@ app = FastAPI(title="FLS Inference Server", version="1.0.0")
 _mgr: Optional[ModelManager] = None
 
 
+def _set_version_gauge(version: str) -> None:
+    """Extract numeric patch from vX.Y.Z and set gauge."""
+    try:
+        patch = int(version.lstrip("v").split(".")[-1])
+        model_version_active.set(patch)
+    except (ValueError, IndexError):
+        pass
+
+
 @app.on_event("startup")
 async def startup():
     global _mgr
+    # Start dedicated Prometheus metrics server on port 9100
+    metrics_port = int(os.environ.get("METRICS_PORT", "9100"))
+    start_http_server(metrics_port)
+    log.info("Prometheus metrics on :%d", metrics_port)
+
     _mgr = ModelManager()
     _mgr.load_initial()
+    _set_version_gauge(_mgr.model_version)
     log.info("Inference server ready: model=%s", _mgr.model_version)
 
 
@@ -126,6 +146,7 @@ async def reload():
         raise HTTPException(status_code=503, detail="Server not initialized")
 
     new_version = _mgr.reload()
+    _set_version_gauge(new_version)
     return ReloadResponse(
         status="ok",
         model_version=new_version,

@@ -1,4 +1,5 @@
 import { useCallback, useReducer } from "react";
+import type { InferenceSource } from "../inference/inference_pipeline";
 
 export type RoundState = "IDLE" | "OPEN" | "COLLECTING" | "DONE";
 
@@ -7,6 +8,7 @@ export interface KeyboardState {
   contextBuffer: number[];
   suggestions: [string, string, string];
   modelVersion: string;
+  modelSource: InferenceSource;
   roundState: RoundState;
   dpEpsilon: number;
   dpBudget: number;
@@ -23,8 +25,9 @@ type Action =
   | { type: "TOGGLE_SHIFT" }
   | { type: "TOGGLE_NUMBERS" }
   | { type: "SELECT_SUGGESTION"; index: number }
-  | { type: "SET_SUGGESTIONS"; suggestions: [string, string, string] }
+  | { type: "SET_SUGGESTIONS"; suggestions: [string, string, string]; source?: InferenceSource }
   | { type: "SET_MODEL_VERSION"; version: string }
+  | { type: "SET_MODEL_SOURCE"; source: InferenceSource }
   | { type: "SET_ROUND_STATE"; state: RoundState }
   | { type: "SET_DP"; epsilon: number; budget: number }
   | { type: "INCREMENT_BUFFER" };
@@ -36,6 +39,7 @@ const initialState: KeyboardState = {
   contextBuffer: [],
   suggestions: ["", "", ""],
   modelVersion: "v0.0.0",
+  modelSource: "loading",
   roundState: "IDLE",
   dpEpsilon: 0.0,
   dpBudget: 1.0,
@@ -99,9 +103,15 @@ function reducer(state: KeyboardState, action: Action): KeyboardState {
       return { ...state, text: newText, trainingBuffer: state.trainingBuffer + 1 };
     }
     case "SET_SUGGESTIONS":
-      return { ...state, suggestions: action.suggestions };
+      return {
+        ...state,
+        suggestions: action.suggestions,
+        ...(action.source ? { modelSource: action.source } : {}),
+      };
     case "SET_MODEL_VERSION":
       return { ...state, modelVersion: action.version };
+    case "SET_MODEL_SOURCE":
+      return { ...state, modelSource: action.source };
     case "SET_ROUND_STATE":
       return { ...state, roundState: action.state };
     case "SET_DP":
@@ -133,12 +143,16 @@ export function useKeyboardState() {
     []
   );
   const setSuggestions = useCallback(
-    (suggestions: [string, string, string]) =>
-      dispatch({ type: "SET_SUGGESTIONS", suggestions }),
+    (suggestions: [string, string, string], source?: InferenceSource) =>
+      dispatch({ type: "SET_SUGGESTIONS", suggestions, source }),
     []
   );
   const setModelVersion = useCallback(
     (version: string) => dispatch({ type: "SET_MODEL_VERSION", version }),
+    []
+  );
+  const setModelSource = useCallback(
+    (source: InferenceSource) => dispatch({ type: "SET_MODEL_SOURCE", source }),
     []
   );
   const setRoundState = useCallback(
@@ -163,6 +177,7 @@ export function useKeyboardState() {
     selectSuggestion,
     setSuggestions,
     setModelVersion,
+    setModelSource,
     setRoundState,
     setDP,
   };

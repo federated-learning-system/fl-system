@@ -20,12 +20,15 @@ const (
 
 // Client wraps the MinIO Go SDK.
 type Client struct {
-	mc  *minio.Client
-	log *slog.Logger
+	mc        *minio.Client
+	presignMC *minio.Client // separate client for presigned URLs (public/external endpoint)
+	log       *slog.Logger
 }
 
 // New creates a MinIO client.
-func New(endpoint, accessKey, secretKey string, useSSL bool, log *slog.Logger) (*Client, error) {
+// presignEndpoint is optional: when non-empty, presigned URLs are generated using
+// that endpoint instead of the internal one (use for Docker/external client access).
+func New(endpoint, accessKey, secretKey string, useSSL bool, log *slog.Logger, presignEndpoint ...string) (*Client, error) {
 	mc, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: useSSL,
@@ -33,12 +36,29 @@ func New(endpoint, accessKey, secretKey string, useSSL bool, log *slog.Logger) (
 	if err != nil {
 		return nil, fmt.Errorf("minio client: %w", err)
 	}
-	return &Client{mc: mc, log: log}, nil
+	c := &Client{mc: mc, log: log}
+	if len(presignEndpoint) > 0 && presignEndpoint[0] != "" {
+		pmc, err := minio.New(presignEndpoint[0], &minio.Options{
+			Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
+			Secure: false,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("minio presign client: %w", err)
+		}
+		c.presignMC = pmc
+		log.Info("MinIO presigned URLs will use public endpoint", "endpoint", presignEndpoint[0])
+	}
+	return c, nil
 }
 
 // PresignedGetURL generates a presigned download URL for the given object.
+// Uses the public endpoint client if configured.
 func (c *Client) PresignedGetURL(ctx context.Context, bucket, key string) (string, error) {
-	u, err := c.mc.PresignedGetObject(ctx, bucket, key, PresignTTL, nil)
+	mc := c.mc
+	if c.presignMC != nil {
+		mc = c.presignMC
+	}
+	u, err := mc.PresignedGetObject(ctx, bucket, key, PresignTTL, nil)
 	if err != nil {
 		return "", fmt.Errorf("presign get %s/%s: %w", bucket, key, err)
 	}
@@ -46,8 +66,13 @@ func (c *Client) PresignedGetURL(ctx context.Context, bucket, key string) (strin
 }
 
 // PresignedPutURL generates a presigned upload URL.
+// Uses the public endpoint client if configured.
 func (c *Client) PresignedPutURL(ctx context.Context, bucket, key string) (string, error) {
-	u, err := c.mc.PresignedPutObject(ctx, bucket, key, PresignTTL)
+	mc := c.mc
+	if c.presignMC != nil {
+		mc = c.presignMC
+	}
+	u, err := mc.PresignedPutObject(ctx, bucket, key, PresignTTL)
 	if err != nil {
 		return "", fmt.Errorf("presign put %s/%s: %w", bucket, key, err)
 	}
@@ -81,6 +106,12 @@ func (c *Client) ObjectExists(ctx context.Context, bucket, key string) (bool, er
 // ModelPresignedURL returns a presigned URL for the quantized ONNX model.
 func (c *Client) ModelPresignedURL(ctx context.Context, version string) (string, error) {
 	key := fmt.Sprintf("models/%s/model_quant.onnx", version)
+	return c.PresignedGetURL(ctx, BucketModels, key)
+}
+
+// WeightsPresignedURL returns a presigned URL for the PyTorch weights checkpoint.
+func (c *Client) WeightsPresignedURL(ctx context.Context, version string) (string, error) {
+	key := fmt.Sprintf("models/%s/model_weights.pt", version)
 	return c.PresignedGetURL(ctx, BucketModels, key)
 }
 

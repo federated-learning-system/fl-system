@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19\x61ggregation_service.proto\x12\x11\x66l.aggregation.v1\"h\n\rStartRoundReq\x12\x10\n\x08round_id\x18\x01 \x01(\t\x12\x15\n\rmodel_version\x18\x02 \x01(\t\x12.\n\x06\x63onfig\x18\x03 \x01(\x0b\x32\x1e.fl.aggregation.v1.RoundConfig\"\xd1\x01\n\x0bRoundConfig\x12\x14\n\x0clocal_epochs\x18\x01 \x01(\x05\x12\x13\n\x0bmin_clients\x18\x02 \x01(\x05\x12\x15\n\rdeadline_unix\x18\x03 \x01(\x03\x12\'\n\x02\x64p\x18\x04 \x01(\x0b\x32\x1b.fl.aggregation.v1.DPConfig\x12\x13\n\x0b\x63ompression\x18\x05 \x01(\t\x12\x15\n\rasync_allowed\x18\x06 \x01(\x08\x12\x17\n\x0fmini_batch_size\x18\x07 \x01(\x05\x12\x12\n\nfedprox_mu\x18\x08 \x01(\x01\"Q\n\x08\x44PConfig\x12\x0f\n\x07\x65psilon\x18\x01 \x01(\x01\x12\r\n\x05\x64\x65lta\x18\x02 \x01(\x01\x12\x11\n\tclip_norm\x18\x03 \x01(\x01\x12\x12\n\nnoise_mult\x18\x04 \x01(\x01\"S\n\x0eStartRoundResp\x12\n\n\x02ok\x18\x01 \x01(\x08\x12\x11\n\tmodel_url\x18\x02 \x01(\t\x12\x10\n\x08\x64\x65\x61\x64line\x18\x03 \x01(\x03\x12\x10\n\x08round_id\x18\x04 \x01(\t\"$\n\x0bGetModelReq\x12\x15\n\rmodel_version\x18\x01 \x01(\t\"H\n\x0cGetModelResp\x12\x11\n\tmodel_url\x18\x01 \x01(\t\x12\x12\n\nmodel_meta\x18\x02 \x01(\x0c\x12\x11\n\tvocab_url\x18\x03 \x01(\t\"|\n\x0fSubmitUpdateReq\x12\x10\n\x08round_id\x18\x01 \x01(\t\x12\x11\n\tclient_id\x18\x02 \x01(\t\x12\x13\n\x0bupdate_blob\x18\x03 \x01(\x0c\x12/\n\x04meta\x18\x04 \x01(\x0b\x32!.fl.aggregation.v1.UpdateMetadata\"\xc9\x01\n\x0eUpdateMetadata\x12\x13\n\x0bnum_samples\x18\x01 \x01(\x05\x12\x14\n\x0clocal_epochs\x18\x02 \x01(\x05\x12\x12\n\ndp_epsilon\x18\x03 \x01(\x01\x12\x10\n\x08\x64p_delta\x18\x04 \x01(\x01\x12\x11\n\tclip_norm\x18\x05 \x01(\x01\x12\x15\n\rmodel_version\x18\x06 \x01(\t\x12\x10\n\x08\x63hecksum\x18\x07 \x01(\t\x12\x14\n\x0c\x64\x65vice_class\x18\x08 \x01(\t\x12\x14\n\x0cis_straggler\x18\t \x01(\x08\"4\n\x10SubmitUpdateResp\x12\x10\n\x08\x61\x63\x63\x65pted\x18\x01 \x01(\x08\x12\x0e\n\x06reason\x18\x02 \x01(\t\"\xcf\x01\n\nMetricsReq\x12\x11\n\tclient_id\x18\x01 \x01(\t\x12\x10\n\x08round_id\x18\x02 \x01(\t\x12\x1e\n\x16local_train_duration_s\x18\x03 \x01(\x01\x12\x17\n\x0fsamples_trained\x18\x04 \x01(\x05\x12\x18\n\x10\x64p_epsilon_spent\x18\x05 \x01(\x01\x12\x1d\n\x15\x64p_epsilon_cumulative\x18\x06 \x01(\x01\x12\x17\n\x0f\x62\x61ttery_percent\x18\x07 \x01(\x01\x12\x11\n\toffloaded\x18\x08 \x01(\x08\"\x19\n\x0bMetricsResp\x12\n\n\x02ok\x18\x01 \x01(\x08\"k\n\x0bRegisterReq\x12\x11\n\tclient_id\x18\x01 \x01(\t\x12\x14\n\x0c\x64\x65vice_class\x18\x02 \x01(\t\x12\x33\n\x04\x63\x61ps\x18\x03 \x01(\x0b\x32%.fl.aggregation.v1.DeviceCapabilities\"\x7f\n\x12\x44\x65viceCapabilities\x12\x0e\n\x06ram_mb\x18\x01 \x01(\x05\x12\x0f\n\x07has_gpu\x18\x02 \x01(\x08\x12\x11\n\tcpu_cores\x18\x03 \x01(\x05\x12\n\n\x02os\x18\x04 \x01(\t\x12\x11\n\tcan_train\x18\x05 \x01(\x08\x12\x16\n\x0evocab_size_cap\x18\x06 \x01(\x05\"6\n\x0cRegisterResp\x12\n\n\x02ok\x18\x01 \x01(\x08\x12\x1a\n\x12\x61ssigned_client_id\x18\x02 \x01(\t\",\n\x08InferReq\x12\x11\n\ttoken_ids\x18\x01 \x03(\x05\x12\r\n\x05top_k\x18\x02 \x01(\x05\"0\n\tInferResp\x12\x13\n\x0bsuggestions\x18\x01 \x03(\t\x12\x0e\n\x06scores\x18\x02 \x03(\x02\x32\xf8\x03\n\x12\x41ggregationService\x12Q\n\nStartRound\x12 .fl.aggregation.v1.StartRoundReq\x1a!.fl.aggregation.v1.StartRoundResp\x12Q\n\x0eGetGlobalModel\x12\x1e.fl.aggregation.v1.GetModelReq\x1a\x1f.fl.aggregation.v1.GetModelResp\x12W\n\x0cSubmitUpdate\x12\".fl.aggregation.v1.SubmitUpdateReq\x1a#.fl.aggregation.v1.SubmitUpdateResp\x12L\n\x0b\x45mitMetrics\x12\x1d.fl.aggregation.v1.MetricsReq\x1a\x1e.fl.aggregation.v1.MetricsResp\x12Q\n\x0eRegisterClient\x12\x1e.fl.aggregation.v1.RegisterReq\x1a\x1f.fl.aggregation.v1.RegisterResp\x12\x42\n\x05Infer\x12\x1b.fl.aggregation.v1.InferReq\x1a\x1c.fl.aggregation.v1.InferRespB)Z\'github.com/x9z0/fls/proto/aggregationv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19\x61ggregation_service.proto\x12\x11\x66l.aggregation.v1\"h\n\rStartRoundReq\x12\x10\n\x08round_id\x18\x01 \x01(\t\x12\x15\n\rmodel_version\x18\x02 \x01(\t\x12.\n\x06\x63onfig\x18\x03 \x01(\x0b\x32\x1e.fl.aggregation.v1.RoundConfig\"\xd1\x01\n\x0bRoundConfig\x12\x14\n\x0clocal_epochs\x18\x01 \x01(\x05\x12\x13\n\x0bmin_clients\x18\x02 \x01(\x05\x12\x15\n\rdeadline_unix\x18\x03 \x01(\x03\x12\'\n\x02\x64p\x18\x04 \x01(\x0b\x32\x1b.fl.aggregation.v1.DPConfig\x12\x13\n\x0b\x63ompression\x18\x05 \x01(\t\x12\x15\n\rasync_allowed\x18\x06 \x01(\x08\x12\x17\n\x0fmini_batch_size\x18\x07 \x01(\x05\x12\x12\n\nfedprox_mu\x18\x08 \x01(\x01\"Q\n\x08\x44PConfig\x12\x0f\n\x07\x65psilon\x18\x01 \x01(\x01\x12\r\n\x05\x64\x65lta\x18\x02 \x01(\x01\x12\x11\n\tclip_norm\x18\x03 \x01(\x01\x12\x12\n\nnoise_mult\x18\x04 \x01(\x01\"S\n\x0eStartRoundResp\x12\n\n\x02ok\x18\x01 \x01(\x08\x12\x11\n\tmodel_url\x18\x02 \x01(\t\x12\x10\n\x08\x64\x65\x61\x64line\x18\x03 \x01(\x03\x12\x10\n\x08round_id\x18\x04 \x01(\t\"$\n\x0bGetModelReq\x12\x15\n\rmodel_version\x18\x01 \x01(\t\"]\n\x0cGetModelResp\x12\x11\n\tmodel_url\x18\x01 \x01(\t\x12\x12\n\nmodel_meta\x18\x02 \x01(\x0c\x12\x11\n\tvocab_url\x18\x03 \x01(\t\x12\x13\n\x0bweights_url\x18\x04 \x01(\t\"|\n\x0fSubmitUpdateReq\x12\x10\n\x08round_id\x18\x01 \x01(\t\x12\x11\n\tclient_id\x18\x02 \x01(\t\x12\x13\n\x0bupdate_blob\x18\x03 \x01(\x0c\x12/\n\x04meta\x18\x04 \x01(\x0b\x32!.fl.aggregation.v1.UpdateMetadata\"\xc9\x01\n\x0eUpdateMetadata\x12\x13\n\x0bnum_samples\x18\x01 \x01(\x05\x12\x14\n\x0clocal_epochs\x18\x02 \x01(\x05\x12\x12\n\ndp_epsilon\x18\x03 \x01(\x01\x12\x10\n\x08\x64p_delta\x18\x04 \x01(\x01\x12\x11\n\tclip_norm\x18\x05 \x01(\x01\x12\x15\n\rmodel_version\x18\x06 \x01(\t\x12\x10\n\x08\x63hecksum\x18\x07 \x01(\t\x12\x14\n\x0c\x64\x65vice_class\x18\x08 \x01(\t\x12\x14\n\x0cis_straggler\x18\t \x01(\x08\"4\n\x10SubmitUpdateResp\x12\x10\n\x08\x61\x63\x63\x65pted\x18\x01 \x01(\x08\x12\x0e\n\x06reason\x18\x02 \x01(\t\"\xcf\x01\n\nMetricsReq\x12\x11\n\tclient_id\x18\x01 \x01(\t\x12\x10\n\x08round_id\x18\x02 \x01(\t\x12\x1e\n\x16local_train_duration_s\x18\x03 \x01(\x01\x12\x17\n\x0fsamples_trained\x18\x04 \x01(\x05\x12\x18\n\x10\x64p_epsilon_spent\x18\x05 \x01(\x01\x12\x1d\n\x15\x64p_epsilon_cumulative\x18\x06 \x01(\x01\x12\x17\n\x0f\x62\x61ttery_percent\x18\x07 \x01(\x01\x12\x11\n\toffloaded\x18\x08 \x01(\x08\"\x19\n\x0bMetricsResp\x12\n\n\x02ok\x18\x01 \x01(\x08\"k\n\x0bRegisterReq\x12\x11\n\tclient_id\x18\x01 \x01(\t\x12\x14\n\x0c\x64\x65vice_class\x18\x02 \x01(\t\x12\x33\n\x04\x63\x61ps\x18\x03 \x01(\x0b\x32%.fl.aggregation.v1.DeviceCapabilities\"\x7f\n\x12\x44\x65viceCapabilities\x12\x0e\n\x06ram_mb\x18\x01 \x01(\x05\x12\x0f\n\x07has_gpu\x18\x02 \x01(\x08\x12\x11\n\tcpu_cores\x18\x03 \x01(\x05\x12\n\n\x02os\x18\x04 \x01(\t\x12\x11\n\tcan_train\x18\x05 \x01(\x08\x12\x16\n\x0evocab_size_cap\x18\x06 \x01(\x05\"6\n\x0cRegisterResp\x12\n\n\x02ok\x18\x01 \x01(\x08\x12\x1a\n\x12\x61ssigned_client_id\x18\x02 \x01(\t\",\n\x08InferReq\x12\x11\n\ttoken_ids\x18\x01 \x03(\x05\x12\r\n\x05top_k\x18\x02 \x01(\x05\"0\n\tInferResp\x12\x13\n\x0bsuggestions\x18\x01 \x03(\t\x12\x0e\n\x06scores\x18\x02 \x03(\x02\x32\xf8\x03\n\x12\x41ggregationService\x12Q\n\nStartRound\x12 .fl.aggregation.v1.StartRoundReq\x1a!.fl.aggregation.v1.StartRoundResp\x12Q\n\x0eGetGlobalModel\x12\x1e.fl.aggregation.v1.GetModelReq\x1a\x1f.fl.aggregation.v1.GetModelResp\x12W\n\x0cSubmitUpdate\x12\".fl.aggregation.v1.SubmitUpdateReq\x1a#.fl.aggregation.v1.SubmitUpdateResp\x12L\n\x0b\x45mitMetrics\x12\x1d.fl.aggregation.v1.MetricsReq\x1a\x1e.fl.aggregation.v1.MetricsResp\x12Q\n\x0eRegisterClient\x12\x1e.fl.aggregation.v1.RegisterReq\x1a\x1f.fl.aggregation.v1.RegisterResp\x12\x42\n\x05Infer\x12\x1b.fl.aggregation.v1.InferReq\x1a\x1c.fl.aggregation.v1.InferRespB)Z\'github.com/x9z0/fls/proto/aggregationv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -43,27 +43,27 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_GETMODELREQ']._serialized_start=534
   _globals['_GETMODELREQ']._serialized_end=570
   _globals['_GETMODELRESP']._serialized_start=572
-  _globals['_GETMODELRESP']._serialized_end=644
-  _globals['_SUBMITUPDATEREQ']._serialized_start=646
-  _globals['_SUBMITUPDATEREQ']._serialized_end=770
-  _globals['_UPDATEMETADATA']._serialized_start=773
-  _globals['_UPDATEMETADATA']._serialized_end=974
-  _globals['_SUBMITUPDATERESP']._serialized_start=976
-  _globals['_SUBMITUPDATERESP']._serialized_end=1028
-  _globals['_METRICSREQ']._serialized_start=1031
-  _globals['_METRICSREQ']._serialized_end=1238
-  _globals['_METRICSRESP']._serialized_start=1240
-  _globals['_METRICSRESP']._serialized_end=1265
-  _globals['_REGISTERREQ']._serialized_start=1267
-  _globals['_REGISTERREQ']._serialized_end=1374
-  _globals['_DEVICECAPABILITIES']._serialized_start=1376
-  _globals['_DEVICECAPABILITIES']._serialized_end=1503
-  _globals['_REGISTERRESP']._serialized_start=1505
-  _globals['_REGISTERRESP']._serialized_end=1559
-  _globals['_INFERREQ']._serialized_start=1561
-  _globals['_INFERREQ']._serialized_end=1605
-  _globals['_INFERRESP']._serialized_start=1607
-  _globals['_INFERRESP']._serialized_end=1655
-  _globals['_AGGREGATIONSERVICE']._serialized_start=1658
-  _globals['_AGGREGATIONSERVICE']._serialized_end=2162
+  _globals['_GETMODELRESP']._serialized_end=665
+  _globals['_SUBMITUPDATEREQ']._serialized_start=667
+  _globals['_SUBMITUPDATEREQ']._serialized_end=791
+  _globals['_UPDATEMETADATA']._serialized_start=794
+  _globals['_UPDATEMETADATA']._serialized_end=995
+  _globals['_SUBMITUPDATERESP']._serialized_start=997
+  _globals['_SUBMITUPDATERESP']._serialized_end=1049
+  _globals['_METRICSREQ']._serialized_start=1052
+  _globals['_METRICSREQ']._serialized_end=1259
+  _globals['_METRICSRESP']._serialized_start=1261
+  _globals['_METRICSRESP']._serialized_end=1286
+  _globals['_REGISTERREQ']._serialized_start=1288
+  _globals['_REGISTERREQ']._serialized_end=1395
+  _globals['_DEVICECAPABILITIES']._serialized_start=1397
+  _globals['_DEVICECAPABILITIES']._serialized_end=1524
+  _globals['_REGISTERRESP']._serialized_start=1526
+  _globals['_REGISTERRESP']._serialized_end=1580
+  _globals['_INFERREQ']._serialized_start=1582
+  _globals['_INFERREQ']._serialized_end=1626
+  _globals['_INFERRESP']._serialized_start=1628
+  _globals['_INFERRESP']._serialized_end=1676
+  _globals['_AGGREGATIONSERVICE']._serialized_start=1679
+  _globals['_AGGREGATIONSERVICE']._serialized_end=2183
 # @@protoc_insertion_point(module_scope)

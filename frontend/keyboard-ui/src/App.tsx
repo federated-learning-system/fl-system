@@ -129,6 +129,7 @@ function App() {
         dpEpsilon={state.dpEpsilon}
         dpBudget={state.dpBudget}
         modelVersion={state.modelVersion}
+        modelSource={state.modelSource}
         roundState={state.roundState}
         onTypeChar={handleTypeChar}
         onBackspace={backspace}
