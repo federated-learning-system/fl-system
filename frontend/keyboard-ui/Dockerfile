@@ -14,33 +14,22 @@ RUN npm run build
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# SPA fallback + reverse proxy for backend APIs
+# nginx config: SPA fallback + API proxy
 RUN printf 'server {\n\
   listen 3000;\n\
   root /usr/share/nginx/html;\n\
+  client_max_body_size 2m;\n\
 \n\
-  # WebSocket proxy → ws-push service\n\
-  location /ws {\n\
-    proxy_pass http://websocket-push:8080/ws;\n\
-    proxy_http_version 1.1;\n\
-    proxy_set_header Upgrade $http_upgrade;\n\
-    proxy_set_header Connection "upgrade";\n\
+  # Proxy /api/client/ to web-bridge sidecar\n\
+  location /api/client/ {\n\
+    proxy_pass http://127.0.0.1:8090/;\n\
     proxy_set_header Host $host;\n\
-    proxy_read_timeout 86400;\n\
   }\n\
 \n\
-  # Reverse proxy: /api/rounds/ → orchestration controller\n\
-  location /api/rounds/ {\n\
-    proxy_pass http://orchestration:8082/rounds/;\n\
-    proxy_set_header Host $host;\n\
-    proxy_set_header X-Real-IP $remote_addr;\n\
-  }\n\
-\n\
-  # Reverse proxy: /api/ → inference server\n\
+  # Proxy /api/ to Inference Server\n\
   location /api/ {\n\
     proxy_pass http://inference-server:8000/;\n\
     proxy_set_header Host $host;\n\
-    proxy_set_header X-Real-IP $remote_addr;\n\
   }\n\
 \n\
   # SPA fallback\n\

@@ -123,8 +123,8 @@ describe("Number toggle", () => {
   });
 });
 
-describe("Space increments training buffer", () => {
-  it("increases sample count on space press", () => {
+describe("Keystrokes populate training buffer", () => {
+  it("counts each keystroke as a training event", () => {
     render(<App />);
     const status = screen.getByTestId("status-bar");
 
@@ -132,6 +132,7 @@ describe("Space increments training buffer", () => {
     fireEvent.mouseDown(screen.getByTestId("key-i"));
     fireEvent.mouseDown(screen.getByTestId("space-key"));
 
-    expect(status).toHaveTextContent("1 samples");
+    // Each key press (h, i, space) records a training event = 3 total
+    expect(status).toHaveTextContent("3 samples");
   });
 });
